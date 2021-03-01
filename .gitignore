@@ -1,0 +1,9 @@
+*.sh
+*.png
+*.pickle
+*.pt
+*.npy
+*.log
+*.pyc
+*.pth
+events.out.tfevents.*
