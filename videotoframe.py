@@ -134,11 +134,25 @@ if __name__ == '__main__':
     root = config.root
     data_list = np.genfromtxt(os.path.join(root, "Anomaly_Train.txt"), dtype=str)
     for video in data_list:
-        convert = converter(os.path.join(root, video))
+        if video.find("Normal") >= 0:
+            convert = converter(os.path.join(root, video))
+        else:
+            convert = converter(os.path.join(root, "Anomaly-Videos", video))
+
         if args.reset:
             convert.reset()
         else:
             print(video)
-            convert.BG_sub("KNN")
-            #convert.toframe()
-        break
+            convert.toframe()
+    data_list_test = np.genfromtxt(
+            os.path.join(root, "Temporal_Anomaly_Annotation_for_Testing_Videos.txt"), dtype=str
+    )
+    for data in data_list_test:
+        video, category, _, _, _, _ = data
+        if category == 'Normal':
+            convert = converter(os.path.join(root, 'Testing_Normal_Videos_Anomaly', video))
+        else:
+            convert = converter(os.path.join(root, 'Anomaly-Videos', category, video))
+        print(video)
+        convert.toframe()
+        
