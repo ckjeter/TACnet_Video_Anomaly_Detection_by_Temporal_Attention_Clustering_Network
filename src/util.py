@@ -4,8 +4,9 @@ import numpy as np
 from datetime import datetime
 from tensorboardX import SummaryWriter 
 import logging
-from sklearn.metrics import fbeta_score 
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import fbeta_score, roc_auc_score, roc_curve, auc
+from matplotlib.patches import Rectangle
+import matplotlib.pyplot as plt
 import os
 import ipdb
 
@@ -29,26 +30,69 @@ class Scorer():
     def auc(self):
         return roc_auc_score(self.label, self.predict)
 
-class AnomalyType():
+class AnomalyType(Scorer):
     def __init__(self, category):
+        super().__init__()
         self.category = category
-        self.scorer = Scorer()
-    def add(self, predict, label):
-        self.scorer.add(predict, label)
-    def auc(self):
-        return self.scorer.auc()
 
-class AnomalyScorer():
+class AnomalyVideo(Scorer):
+    def __init__(self, title, feature, predict, label, rawlabel):
+        super().__init__()
+        self.title = title
+        self.feature = feature
+        self.predict = predict
+        self.label = label
+        self.rawlabel = rawlabel
+    def clusterplot(self):
+        figure, ax = plt.subplots()
+        downsample = TSNE(n_components=2).fit_transform(self.feature.squeeze(0).cpu().detach())
+        newlabel = [0] * self.feature.shape[1]
+        for i in range(0, 4, 2):
+            if self.rawlabel[i] != -1:
+                newlabel[int(self.rawlabel[i]/16):int(self.rawlabel[i+1]/16)] \
+                = [1] * (int(self.rawlabel[i+1]/16)-int(self.rawlabel[i]/16))
+        newlabel = np.array(newlabel)
+        plt.title(self.title)
+        plt.scatter(x=downsample.T[0], y=downsample.T[1], c=newlabel)
+        return figure
+    def predictplot(self):
+        figure, ax = plt.subplots()
+        plt.plot(self.predict)
+        plt.title(self.title)
+        plt.xlabel('Frame number')
+        plt.ylabel('Anomaly score')
+        for i in range(0, len(self.rawlabel), 2):
+            if self.rawlabel[i] != -1:
+                ax.add_patch(Rectangle((self.rawlabel[i], 0)
+                    , self.rawlabel[i+1]-self.rawlabel[i], 1, color='red', alpha=0.5))
+        try:
+            props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+            text = "AUC: " + str(self.auc)[:4]
+            plt.text(0, 1.1, text, bbox=props)
+        except:
+            pass
+        return figure
+
+class AnomalyResult():
     def __init__(self):
+        self.videos = {}
         self.types = {}
         self.scorer = Scorer()
         self.bagscorer = Scorer()
-    def add(self, title, predict, label):
+    def add(self, title, feature, predict, rawlabel):
+        #compute label
+        label = [0] * len(predict)
+        for i in range(0, 4, 2):
+            if label[i] != -1:
+                label[rawlabel[i]:rawlabel[i+1]] = [1] * (rawlabel[i+1]-rawlabel[i])
+        #detect category
         category = title[:-3]
         if category.find("Normal") >= 0:
             category = "Normal"
         if category not in self.types:
             self.types[category] = AnomalyType(category)
+        #add to predictions
+        self.videos[title] = AnomalyVideo(title, feature, predict, label, rawlabel)
         self.types[category].add(predict, label)
         self.scorer.add(predict, label)
     def addbag(self, predict, label):
@@ -57,6 +101,25 @@ class AnomalyScorer():
         return self.scorer.auc()
     def aucbag(self):
         return self.bagscorer.auc()
+    def roccurve(self):
+        fpr, tpr, t = roc_curve(self.scorer.label, self.scorer.predict)
+        figure, ax = plt.subplots()
+        plt.plot(fpr, tpr, color='darkorange',
+                         lw=2, label='ROC curve (area = %0.2f)' % self.scorer.auc())
+        plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('ROC curve')
+        plt.legend(loc="lower right")
+        return figure
+    def clusterplot(self, title):
+        return self.videos[title].clusterplot()
+    def predictplot(self, title):
+        return self.videos[title].predictplot()
+
+
 
 class logger():
     def __init__(self, args):
