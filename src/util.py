@@ -67,7 +67,7 @@ class AnomalyVideo(Scorer):
                     , self.rawlabel[i+1]-self.rawlabel[i], 1, color='red', alpha=0.5))
         try:
             props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
-            text = "AUC: " + str(self.auc)[:4]
+            text = "AUC: " + str(self.auc())[:4]
             plt.text(0, 1.1, text, bbox=props)
         except:
             pass
