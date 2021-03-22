@@ -19,7 +19,6 @@ from tqdm import tqdm
 import ipdb
 from datetime import datetime
 import matplotlib.pyplot as plt
-from sklearn.manifold import TSNE
 from matplotlib.patches import Rectangle
 
 from tensorboardX import SummaryWriter 
@@ -40,6 +39,7 @@ def bagexpand(bag, K=16):
     return instances
 
 def predict(net, loader, device, args):
+    torch.manual_seed(777)
     maxauc = 0
     result = AnomalyResult()
     for data in loader:
@@ -51,7 +51,7 @@ def predict(net, loader, device, args):
             baglabel = 0
         else:
             baglabel = 1
-        feature, A, bagoutput = net(feature)
+        feature, clusters, output_seg, bagoutput = net(feature)
             
         result.addbag(bagoutput.view(-1).tolist(), [baglabel])
         #test my idea
@@ -60,14 +60,17 @@ def predict(net, loader, device, args):
         #A = net.maxminnorm(A * atten_weight)
         
         if bagoutput.item() < 0.1:
-            framepredict = [0] * (len(A) * 16)
+            framepredict = [0] * (len(output_seg) * 16)
         else:
-            framepredict = bagexpand(A)
+            framepredict = bagexpand(output_seg)
 
         result.add(title[0], feature, framepredict, label)
         if args.draw:
             figure = result.predictplot(title[0])
-            figure.savefig(os.path.join('image', title[0]+'.png'))
+            figure.savefig(os.path.join('image', 'performance', title[0]+'.png'))
+            plt.close(figure)
+            figure = result.clusterplot(title[0])
+            figure.savefig(os.path.join('image', 'cluster', title[0]+'.png'))
             plt.close(figure)
     return result 
 
@@ -83,7 +86,7 @@ if __name__ == "__main__":
 
     backbone = C3D()
     backbone.load_state_dict(torch.load("models/c3d.pickle"))
-    net = Attention(args.attention_type)
+    net = Attention(args, device)
     if multi_gpus:
         backbone = nn.DataParallel(backbone).to(device)
         net = nn.DataParallel(net).to(device)
@@ -100,4 +103,3 @@ if __name__ == "__main__":
     roc.savefig("ROC.png")
     logger.auc_types(result)
     print(result.auc())
-

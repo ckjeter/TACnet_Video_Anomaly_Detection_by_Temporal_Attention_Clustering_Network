@@ -7,6 +7,7 @@ import logging
 from sklearn.metrics import fbeta_score, roc_auc_score, roc_curve, auc
 from matplotlib.patches import Rectangle
 import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
 import os
 import ipdb
 
@@ -115,6 +116,8 @@ class AnomalyResult():
         plt.legend(loc="lower right")
         return figure
     def clusterplot(self, title):
+        #figure = self.videos[title].clusterplot()
+        #figure.savefig(title + "_features.png")
         return self.videos[title].clusterplot()
     def predictplot(self, title):
         return self.videos[title].predictplot()
@@ -123,6 +126,7 @@ class AnomalyResult():
 
 class logger():
     def __init__(self, args):
+        self.args = args
         self.root, self.log = logfile(args)
         if args.savelog:
             self.log.info("Saving log: {}".format(os.path.join("log", self.root + ".log")))
@@ -137,21 +141,28 @@ class logger():
                 self.writer = SummaryWriter(os.path.join('runs', self.root.split("/")[1]))
 
     def recordloss(self, losses, epoch):
-        self.writer.add_scalar('bag_loss', losses[0], epoch)
-        self.writer.add_scalar('cluster_loss_far', losses[1], epoch)
-        self.writer.add_scalar('cluster_loss_close', losses[2], epoch)
-        self.writer.add_scalar('smooth_loss', losses[3], epoch)
+        if self.args.savelog: 
+            self.writer.add_scalar('bag_loss', losses[0], epoch)
+            self.writer.add_scalar('cluster_loss_far', losses[1], epoch)
+            self.writer.add_scalar('cluster_loss_close', losses[2], epoch)
+            self.writer.add_scalar('smooth_loss', losses[3], epoch)
+            self.writer.add_scalar('inner_anomaly_loss', losses[4], epoch)
+            self.writer.add_scalar('inner_normal_loss', losses[5], epoch)
         self.log.info(
                 "bag_loss: {:.4f}, smooth_loss: {:.4f}".format(losses[0], losses[3])
         )
         self.log.info(
                 "cluster_far_loss: {:.4f}, cluster_close_loss: {:.4f}".format(losses[1], losses[2])
         )
+        self.log.info(
+                "innerbag_anomaly_loss: {:.4f}, innerbag_normal_loss: {:.4f}".format(losses[4], losses[5])
+        )
 
     def recordauc(self, result, epoch):
-        self.writer.add_scalar('bag_accuracy', result.aucbag(), epoch)
+        if self.args.savelog:
+            self.writer.add_scalar('bag_accuracy', result.aucbag(), epoch)
+            self.writer.add_scalar('AUC', result.auc(), epoch)
         self.log.info("Bag Acc: {:.4f}".format(result.aucbag()))
-        self.writer.add_scalar('AUC', result.auc(), epoch)
         self.log.info("AUC: {:.4f}".format(result.auc()))
     def auc_types(self, result):
         for k, v in result.types.items():

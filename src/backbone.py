@@ -2,12 +2,14 @@ import torch
 import torch.nn as nn
 from torchvision import models
 import torch.nn.functional as F
+from kmeans_pytorch import kmeans
 import ipdb
 
 class Attention(nn.Module):
-    def __init__(self, attention_type):
+    def __init__(self, args, device):
         super(Attention, self).__init__()
-        self.attention_type = attention_type
+        self.attention_type = args.attention_type
+        self.device = device
         self.L = 2048
         self.D = 1024
         self.mlp1 = nn.Sequential(
@@ -29,35 +31,53 @@ class Attention(nn.Module):
             nn.Sigmoid()
         )
         self.attention_gate = nn.Linear(self.D, 1)
-        self.classification = nn.Sequential(
+        self.c_bag = self.classifier()
+        self.c_segment = self.classifier()
+
+    def classifier(self):
+        return nn.Sequential(
             nn.Linear(self.L, self.D),
             nn.ReLU(),
+            nn.Dropout(0.5),
             nn.Linear(1024, 512),
             nn.ReLU(),
-            nn.Linear(512, 128),
+            nn.Dropout(0.5),
+            nn.Linear(512, 32),
             nn.ReLU(),
-            nn.Linear(128, 1),
-            nn.Sigmoid()
+            nn.Dropout(0.5),
+            nn.Linear(32, 1)
         )
+
     def maxminnorm(self, A):
         A = A.view(-1)
         return (A - min(A)) / (max(A)-min(A))
 
     def forward(self, feature):
         feature = self.mlp1(feature)
+        #Attention path
         if self.attention_type == 'normal':
             A = self.attention(feature)
         elif self.attention_type == 'gate':
             A_V = self.attention_V(feature)
             A_U = self.attention_U(feature)
             A = self.attention_gate(A_V * A_U)
-        A = torch.transpose(A, 1, 2)
-        A = F.softmax(A, dim=2)
-        bag = torch.mm(A.squeeze(0), feature.squeeze(0))
+        A = torch.transpose(A, 1, 2).squeeze(0)
+        bag = torch.mm(F.softmax(A, dim=1), feature.squeeze(0))
+        output1 = torch.sigmoid(self.c_bag(bag)).view(-1)
 
-        output = self.classification(bag)
-        
-        return feature, self.maxminnorm(A), output
+        #Cluster path
+        clusters, centers = kmeans(
+            X=feature.squeeze(0), num_clusters=2, distance='euclidean', device=self.device, tqdm_flag=False)
+        output_seg = self.c_segment(feature)
+        attention_boost = 2 * torch.sigmoid(A.view(-1))
+        output_seg = torch.sigmoid(output_seg.view(-1) * attention_boost)
+        c1 = torch.nonzero(clusters==0).view(-1).to(self.device)
+        c2 = torch.nonzero(clusters!=0).view(-1).to(self.device)
+        c1 = torch.index_select(output_seg, 0, c1)
+        c2 = torch.index_select(output_seg, 0, c2)
+        output2 = max(c1.mean(), c2.mean()).view(-1)
+        output = torch.mean(torch.cat((output1, output2), 0))
+        return feature, (c1, c2), output_seg, output
 
 class C3D(nn.Module):
     def __init__(self):

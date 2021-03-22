@@ -36,7 +36,7 @@ def main():
 
     backbone = C3D()
     backbone.load_state_dict(torch.load("models/c3d.pickle"))
-    net = Attention(args.attention_type)
+    net = Attention(args, device)
     if multi_gpus:
         backbone = nn.DataParallel(backbone).to(device)
         net = nn.DataParallel(net).to(device)
@@ -51,19 +51,23 @@ def main():
     testloader = DataLoader(testset, batch_size=1, shuffle=False)
 
     optimizer = optim.AdamW(net.parameters(), lr=args.lr)
+    scheduler = MultiStepLR(optimizer, [10, 20, 30], gamma=0.1)
 
     maxauc = 0
     for epoch in range(args.epoch):
         logger.info("Epoch: {}/{}".format(epoch, args.epoch))
+        
         net, losses = train(net, trainloader, device, optimizer)
-        logger.recordloss(losses, epoch)
-
         result = predict(net, testloader, device, args)
+
+        logger.recordloss(losses, epoch)
         logger.recordauc(result, epoch)        
 
         if result.auc() > maxauc:
             maxauc = result.auc()
+        if args.savelog:
             logger.savemodel(net, epoch)
+        scheduler.step()
     logger.info("best preformance: {:.4f}".format(maxauc))
 
         

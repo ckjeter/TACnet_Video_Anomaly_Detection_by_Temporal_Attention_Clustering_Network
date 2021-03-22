@@ -24,7 +24,7 @@ from tensorboardX import SummaryWriter
 from src.dataset import FrameFolderDataset, SegmentDataset
 from src.pytorch_i3d import InceptionI3d
 from src.backbone import C3D, Attention
-from src.loss import ClusterLoss, SmoothLoss
+from src.loss import ClusterLoss, SmoothLoss, InnerBagLoss
 from src.util import Averager
 import src.config as config
         
@@ -32,9 +32,12 @@ def train(net, trainloader, device, optimizer):
     bagLoss = nn.BCELoss().to(device)
     clusterLoss = ClusterLoss(device).to(device)
     smoothLoss = SmoothLoss().to(device)
+    innerbagLoss = InnerBagLoss(device).to(device)
     bag_loss_count = Averager()
     cluster_minloss_count = Averager()
     cluster_maxloss_count = Averager()
+    innerloss_normal_count = Averager()
+    innerloss_anomaly_count = Averager()
     smooth_loss_count = Averager()
 
     for i, data in enumerate(trainloader):
@@ -43,28 +46,33 @@ def train(net, trainloader, device, optimizer):
         title, feature, label = data
         feature = feature.to(device)
         label = label.to(device)
-        feature, A, output = net(feature)
+        feature, clusters, output_seg, output = net(feature)
         
         bag_loss = bagLoss(output.view(-1), label.view(-1).type(torch.float))
         cluster_loss = clusterLoss(feature, label[0])
-        smooth_loss = smoothLoss(A)
+        innerbag_loss = innerbagLoss(clusters, label.item())
+        smooth_loss = smoothLoss(output_seg)
 
         bag_loss_count.add(bag_loss.item())
         smooth_loss_count.add(smooth_loss.item())
-        if label[0] == 0:
+        if label.item() == 0:
             cluster_minloss_count.add(cluster_loss.item())
+            innerloss_normal_count.add(innerbag_loss.item())
         else:
             cluster_maxloss_count.add(cluster_loss.item())
+            innerloss_anomaly_count.add(innerbag_loss.item())
 
-        #loss = 1 * bag_loss + 1 * cluster_loss + 1 * smooth_loss
-        loss = bag_loss + smooth_loss
+        #loss = 1 * bag_loss + 1 * innerbag_loss + 1 * cluster_loss + 1 * smooth_loss
+        loss = bag_loss + innerbag_loss + 0.05 * smooth_loss + 0.05 * cluster_loss
+        #loss = bag_loss + smooth_loss
         #loss = bag_loss
 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
     losses = [bag_loss_count.item(), cluster_maxloss_count.item(), 
-                cluster_minloss_count.item(), smooth_loss_count.item()]
+                cluster_minloss_count.item(), smooth_loss_count.item(),
+                innerloss_anomaly_count.item(), innerloss_normal_count.item()]
     return net, losses
 
 if __name__ == '__main__':
