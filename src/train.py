@@ -24,15 +24,17 @@ from tensorboardX import SummaryWriter
 from src.dataset import FrameFolderDataset, SegmentDataset
 from src.pytorch_i3d import InceptionI3d
 from src.backbone import C3D, Attention
-from src.loss import ClusterLoss, SmoothLoss, InnerBagLoss
+from src.loss import ClusterLoss, SmoothLoss, InnerBagLoss, SmallLoss
 from src.util import Averager
 import src.config as config
         
 def train(net, trainloader, device, optimizer):
+    net.train()
     bagLoss = nn.BCELoss().to(device)
     clusterLoss = ClusterLoss(device).to(device)
     smoothLoss = SmoothLoss().to(device)
     innerbagLoss = InnerBagLoss(device).to(device)
+    smallLoss = SmallLoss().to(device)
     bag_loss_count = Averager()
     cluster_minloss_count = Averager()
     cluster_maxloss_count = Averager()
@@ -52,6 +54,7 @@ def train(net, trainloader, device, optimizer):
         cluster_loss = clusterLoss(feature, label[0])
         innerbag_loss = innerbagLoss(clusters, label.item())
         smooth_loss = smoothLoss(output_seg)
+        small_loss = smallLoss(output_seg)
 
         bag_loss_count.add(bag_loss.item())
         smooth_loss_count.add(smooth_loss.item())
@@ -61,11 +64,9 @@ def train(net, trainloader, device, optimizer):
         else:
             cluster_maxloss_count.add(cluster_loss.item())
             innerloss_anomaly_count.add(innerbag_loss.item())
-
-        #loss = 1 * bag_loss + 1 * innerbag_loss + 1 * cluster_loss + 1 * smooth_loss
-        loss = bag_loss + innerbag_loss + 0.05 * smooth_loss + 0.05 * cluster_loss
-        #loss = bag_loss + smooth_loss
-        #loss = bag_loss
+        parameter = [1, 0.1, 1, 0.5, 0]
+        losses = [bag_loss, cluster_loss, innerbag_loss, smooth_loss, small_loss]
+        loss = sum([p * l for p, l in zip(parameter, losses)])
 
         optimizer.zero_grad()
         loss.backward()

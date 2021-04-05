@@ -35,6 +35,10 @@ class AnomalyType(Scorer):
     def __init__(self, category):
         super().__init__()
         self.category = category
+        self.count = 0
+    def add(self, predict, label):
+        super().add(predict, label)
+        self.count += 1
 
 class AnomalyVideo(Scorer):
     def __init__(self, title, feature, predict, label, rawlabel):
@@ -52,14 +56,28 @@ class AnomalyVideo(Scorer):
             if self.rawlabel[i] != -1:
                 newlabel[int(self.rawlabel[i]/16):int(self.rawlabel[i+1]/16)] \
                 = [1] * (int(self.rawlabel[i+1]/16)-int(self.rawlabel[i]/16))
+        output_seg = []
+        for i in range(0, len(self.predict), 16):
+            output_seg.append(self.predict[i])
+        output_seg = np.array(output_seg)
         newlabel = np.array(newlabel)
+        x = downsample.T[0]
+        y = downsample.T[1]
+        normal_index = np.nonzero(newlabel == 0)[0]
+        anomaly_index = np.nonzero(newlabel != 0)[0]
         plt.title(self.title)
-        plt.scatter(x=downsample.T[0], y=downsample.T[1], c=newlabel)
+        plt.scatter(x=x[anomaly_index], y=y[anomaly_index], c=output_seg[anomaly_index], marker='x', label='Anomaly')
+        plt.scatter(x=x[normal_index], y=y[normal_index], c=output_seg[normal_index], marker='o', label='Normal')
+        cbar = plt.colorbar()
+        plt.clim(0, 1)
+        cbar.set_label("Predict Score")
+        plt.legend()
         return figure
     def predictplot(self):
         figure, ax = plt.subplots()
         plt.plot(self.predict)
         plt.title(self.title)
+        plt.ylim([0, 1])
         plt.xlabel('Frame number')
         plt.ylabel('Anomaly score')
         for i in range(0, len(self.rawlabel), 2):
@@ -167,7 +185,9 @@ class logger():
     def auc_types(self, result):
         for k, v in result.types.items():
             if k != "Normal":
-                print(k, v.auc())
+                print(k, v.auc(), v.count)
+            else:
+                print(k, v.count)
     def savemodel(self, net, epoch):
         savepath = os.path.join(self.root, str(epoch) + '.pth')
         self.log.info("    Save model: {}".format(savepath))

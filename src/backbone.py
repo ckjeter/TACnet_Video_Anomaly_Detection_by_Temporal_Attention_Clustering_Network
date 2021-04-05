@@ -10,13 +10,15 @@ class Attention(nn.Module):
         super(Attention, self).__init__()
         self.attention_type = args.attention_type
         self.device = device
-        self.L = 2048
-        self.D = 1024
+        self.L = 1024
+        self.D = 256
         self.mlp1 = nn.Sequential(
             nn.Linear(4096, 4096),
             nn.ReLU(),
             nn.Linear(4096, self.L)
         )
+        self.rnn = nn.GRU(4096, self.L, 2)
+        self.tsn = nn.Conv1d(in_channels=4096, out_channels=self.L, kernel_size=5, padding=2)
         self.attention = nn.Sequential(
             nn.Linear(self.L, self.D),
             nn.Tanh(),
@@ -31,18 +33,18 @@ class Attention(nn.Module):
             nn.Sigmoid()
         )
         self.attention_gate = nn.Linear(self.D, 1)
-        self.c_bag = self.classifier()
-        self.c_segment = self.classifier()
+        self.c_bag = self.classifier(self.L * 2)
+        self.c_segment = self.classifier(self.L)
 
-    def classifier(self):
+    def classifier(self, input_dim):
         return nn.Sequential(
-            nn.Linear(self.L, self.D),
+            nn.Linear(input_dim, self.D),
             nn.ReLU(),
             nn.Dropout(0.5),
-            nn.Linear(1024, 512),
+            nn.Linear(self.D, int(self.D / 2)),
             nn.ReLU(),
             nn.Dropout(0.5),
-            nn.Linear(512, 32),
+            nn.Linear(int(self.D / 2), 32),
             nn.ReLU(),
             nn.Dropout(0.5),
             nn.Linear(32, 1)
@@ -53,7 +55,10 @@ class Attention(nn.Module):
         return (A - min(A)) / (max(A)-min(A))
 
     def forward(self, feature):
-        feature = self.mlp1(feature)
+        #feature = self.mlp1(feature)
+        feature, hidden = self.rnn(feature)
+        #feature = self.tsn(feature.transpose(1, 2)).transpose(1, 2)
+        #feature = self.mlp1(feature)
         #Attention path
         if self.attention_type == 'normal':
             A = self.attention(feature)
@@ -63,7 +68,10 @@ class Attention(nn.Module):
             A = self.attention_gate(A_V * A_U)
         A = torch.transpose(A, 1, 2).squeeze(0)
         bag = torch.mm(F.softmax(A, dim=1), feature.squeeze(0))
-        output1 = torch.sigmoid(self.c_bag(bag)).view(-1)
+        #output1 = torch.sigmoid(self.c_bag(hidden)).view(-1)
+        output1 = torch.sigmoid(self.c_bag(torch.cat((bag, hidden[0][-1].view(1, -1)), dim=1))).view(-1)
+        #output1 = torch.sigmoid(self.c_bag(bag)).view(-1)
+        #output1 = torch.sigmoid(self.c_bag(hidden[1][-1].view(1, -1))).view(-1)
 
         #Cluster path
         clusters, centers = kmeans(
@@ -71,6 +79,7 @@ class Attention(nn.Module):
         output_seg = self.c_segment(feature)
         attention_boost = 2 * torch.sigmoid(A.view(-1))
         output_seg = torch.sigmoid(output_seg.view(-1) * attention_boost)
+        #output_seg = torch.sigmoid(output_seg.view(-1))
         c1 = torch.nonzero(clusters==0).view(-1).to(self.device)
         c2 = torch.nonzero(clusters!=0).view(-1).to(self.device)
         c1 = torch.index_select(output_seg, 0, c1)

@@ -39,6 +39,7 @@ def bagexpand(bag, K=16):
     return instances
 
 def predict(net, loader, device, args):
+    net.eval()
     torch.manual_seed(777)
     maxauc = 0
     result = AnomalyResult()
@@ -58,12 +59,10 @@ def predict(net, loader, device, args):
         #atten_weight = A
         #A = net.classification(feature).view(-1)
         #A = net.maxminnorm(A * atten_weight)
-        
-        if bagoutput.item() < 0.1:
+        if bagoutput.item() < 0.5:
             framepredict = [0] * (len(output_seg) * 16)
         else:
             framepredict = bagexpand(output_seg)
-
         result.add(title[0], feature, framepredict, label)
         if args.draw:
             figure = result.predictplot(title[0])

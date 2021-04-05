@@ -51,6 +51,7 @@ def main():
     testloader = DataLoader(testset, batch_size=1, shuffle=False)
 
     optimizer = optim.AdamW(net.parameters(), lr=args.lr)
+    #optimizer = optim.SGD(net.parameters(), momentum=0.5, lr=args.lr)
     scheduler = MultiStepLR(optimizer, [10, 20, 30], gamma=0.1)
 
     maxauc = 0
@@ -58,7 +59,8 @@ def main():
         logger.info("Epoch: {}/{}".format(epoch, args.epoch))
         
         net, losses = train(net, trainloader, device, optimizer)
-        result = predict(net, testloader, device, args)
+        with torch.no_grad():
+            result = predict(net, testloader, device, args)
 
         logger.recordloss(losses, epoch)
         logger.recordauc(result, epoch)        

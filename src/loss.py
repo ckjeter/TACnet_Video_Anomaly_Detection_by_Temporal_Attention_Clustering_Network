@@ -56,8 +56,15 @@ class SmoothLoss(nn.Module):
     def __init__(self):
         super(SmoothLoss, self).__init__()
     def forward(self,A):
-        loss = (A[1] - A[0])**2
+        loss = (A[0] - A[1])**2
         for i in range(1, len(A)-1):
-            loss += (A[i+1] - A[i])**2
+            loss += (A[i] - A[i + 1])**2
         return loss
+
+class SmallLoss(nn.Module):
+    def __init__(self):
+        super(SmallLoss, self).__init__()
+    def forward(self, A):
+        return A.sum()
+
 
