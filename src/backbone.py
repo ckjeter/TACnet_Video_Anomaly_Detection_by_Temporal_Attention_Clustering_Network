@@ -17,8 +17,8 @@ class Attention(nn.Module):
             nn.ReLU(),
             nn.Linear(4096, self.L)
         )
-        self.rnn = nn.GRU(4096, self.L, 2)
-        self.tsn = nn.Conv1d(in_channels=4096, out_channels=self.L, kernel_size=5, padding=2)
+        self.rnn = nn.GRU(4096, self.L, 2, batch_first=True)
+        self.tsn = nn.Conv1d(in_channels=4096, out_channels=self.L, kernel_size=3, padding=1)
         self.attention = nn.Sequential(
             nn.Linear(self.L, self.D),
             nn.Tanh(),
@@ -33,7 +33,7 @@ class Attention(nn.Module):
             nn.Sigmoid()
         )
         self.attention_gate = nn.Linear(self.D, 1)
-        self.c_bag = self.classifier(self.L * 2)
+        self.c_bag = self.classifier(self.L)
         self.c_segment = self.classifier(self.L)
 
     def classifier(self, input_dim):
@@ -54,9 +54,10 @@ class Attention(nn.Module):
         A = A.view(-1)
         return (A - min(A)) / (max(A)-min(A))
 
-    def forward(self, feature):
-        #feature = self.mlp1(feature)
-        feature, hidden = self.rnn(feature)
+    def forward(self, input):
+        feature = torch.nan_to_num(input)
+        feature = self.mlp1(feature)
+        #feature, hidden = self.rnn(feature)
         #feature = self.tsn(feature.transpose(1, 2)).transpose(1, 2)
         #feature = self.mlp1(feature)
         #Attention path
@@ -66,27 +67,40 @@ class Attention(nn.Module):
             A_V = self.attention_V(feature)
             A_U = self.attention_U(feature)
             A = self.attention_gate(A_V * A_U)
-        A = torch.transpose(A, 1, 2).squeeze(0)
-        bag = torch.mm(F.softmax(A, dim=1), feature.squeeze(0))
-        #output1 = torch.sigmoid(self.c_bag(hidden)).view(-1)
-        output1 = torch.sigmoid(self.c_bag(torch.cat((bag, hidden[0][-1].view(1, -1)), dim=1))).view(-1)
-        #output1 = torch.sigmoid(self.c_bag(bag)).view(-1)
-        #output1 = torch.sigmoid(self.c_bag(hidden[1][-1].view(1, -1))).view(-1)
-
+        A = torch.transpose(A, 1, 2)
+        bag = torch.bmm(F.softmax(A, dim=2), feature).squeeze(1)
+        #bag = torch.bmm(A, feature)
+        #output1 = torch.sigmoid(self.c_bag(torch.cat((bag, hidden[-1]), dim=1))).view(-1)
+        output1 = torch.sigmoid(self.c_bag(bag)).view(-1)
         #Cluster path
-        clusters, centers = kmeans(
-            X=feature.squeeze(0), num_clusters=2, distance='euclidean', device=self.device, tqdm_flag=False)
-        output_seg = self.c_segment(feature)
-        attention_boost = 2 * torch.sigmoid(A.view(-1))
-        output_seg = torch.sigmoid(output_seg.view(-1) * attention_boost)
-        #output_seg = torch.sigmoid(output_seg.view(-1))
-        c1 = torch.nonzero(clusters==0).view(-1).to(self.device)
-        c2 = torch.nonzero(clusters!=0).view(-1).to(self.device)
-        c1 = torch.index_select(output_seg, 0, c1)
-        c2 = torch.index_select(output_seg, 0, c2)
-        output2 = max(c1.mean(), c2.mean()).view(-1)
-        output = torch.mean(torch.cat((output1, output2), 0))
-        return feature, (c1, c2), output_seg, output
+        output_seg = self.c_segment(feature).squeeze(2)
+        attention_boost = 2 * torch.sigmoid(A).squeeze(1)
+        output_seg = torch.sigmoid(output_seg * attention_boost)
+        #output_seg = torch.sigmoid(output_seg)
+        cluster1 = []
+        cluster2 = []
+        output2 = torch.tensor([]).to(self.device)
+        for i in range(feature.shape[0]):
+            #f = feature_dirty[i][~torch.any(feature_dirty[i].isnan(),dim=1)]
+            f = feature[i]
+            cluster, centers = kmeans(
+                X=f, num_clusters=2, distance='euclidean', device=self.device)
+            #output_seg = torch.sigmoid(output_seg.view(-1))
+            c1 = torch.nonzero(cluster==0).view(-1).to(self.device)
+            c2 = torch.nonzero(cluster!=0).view(-1).to(self.device)
+            c1 = torch.index_select(output_seg[i], 0, c1)
+            c2 = torch.index_select(output_seg[i], 0, c2)
+            #out = max(c1.max(), c2.max()).view(-1)
+            out = output_seg[i].max().view(-1)
+            cluster1.append(c1)
+            cluster2.append(c2)
+            output2 = torch.cat((output2, out), dim=0)
+        weight = 0.5
+        output1 = output1 * weight
+        output2 = output2 * (1 - weight)
+        output = torch.cat((output1.view(-1, 1), output2.view(-1, 1)), 1)
+        #output = output2
+        return feature, (cluster1, cluster2), output_seg, output, A
 
 class C3D(nn.Module):
     def __init__(self):

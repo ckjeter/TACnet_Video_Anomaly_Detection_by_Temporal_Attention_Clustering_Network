@@ -32,73 +32,48 @@ import src.util as util
 import src.config as config
 
 
-def bagexpand(bag, K=16):
+def bagexpand(bag, length):
     instances = []
-    for value in bag:
-        instances += [float(value)] * 16
+    for i, value in enumerate(bag):
+        instances += [float(value)] * (16 * length[i])
     return instances
 
-def predict(net, loader, device, args):
+def test(net, loader, device, args):
     net.eval()
     torch.manual_seed(777)
     maxauc = 0
     result = AnomalyResult()
-    for data in loader:
-        title, feature, label = data
+    for i, data in enumerate(loader):
+        sys.stdout.write("{}/{}\r".format(i, len(loader)))
+        sys.stdout.flush()
+        title, feature, label, length = data
         feature = feature.to(device)
-        label = label.squeeze(0).to(device)
+        label = label[0]
+        length = length[0]
 
         if label[0] < 0:
             baglabel = 0
         else:
             baglabel = 1
-        feature, clusters, output_seg, bagoutput = net(feature)
-            
+        feature, clusters, output_seg, bagoutput, A = net(feature)
+        bagoutput = torch.sum(bagoutput, 1)
         result.addbag(bagoutput.view(-1).tolist(), [baglabel])
+        
         #test my idea
         #atten_weight = A
         #A = net.classification(feature).view(-1)
         #A = net.maxminnorm(A * atten_weight)
         if bagoutput.item() < 0.5:
-            framepredict = [0] * (len(output_seg) * 16)
+            framepredict = [0] * (sum(length).item()) * 16
         else:
-            framepredict = bagexpand(output_seg)
-        result.add(title[0], feature, framepredict, label)
-        if args.draw:
+            framepredict = bagexpand(output_seg[0].cpu().tolist(), length)
+        result.add(title[0], feature, framepredict, label, length)
+        if args.p_graph:
             figure = result.predictplot(title[0])
             figure.savefig(os.path.join('image', 'performance', title[0]+'.png'))
             plt.close(figure)
+        if args.c_graph:
             figure = result.clusterplot(title[0])
             figure.savefig(os.path.join('image', 'cluster', title[0]+'.png'))
             plt.close(figure)
     return result 
-
-if __name__ == "__main__":
-    args = config.parse_args()
-    logger = util.logger(args)
-    multi_gpus = False
-    if len(args.gpus.split(',')) > 1:
-        multi_gpus = True
-    os.environ['CUDA_VISIBLE_DEVICES'] = args.gpus
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    logging.info(device)
-
-    backbone = C3D()
-    backbone.load_state_dict(torch.load("models/c3d.pickle"))
-    net = Attention(args, device)
-    if multi_gpus:
-        backbone = nn.DataParallel(backbone).to(device)
-        net = nn.DataParallel(net).to(device)
-    else:
-        backbone = backbone.to(device)
-        net = net.to(device)
-        
-    testset = SegmentDataset(args.test_path, test=True)
-    testloader = DataLoader(testset, batch_size=1, shuffle=False)
-    
-    net.load_state_dict(torch.load(args.model_path))
-    result = predict(net, testloader, device, args)
-    roc = result.roccurve()
-    roc.savefig("ROC.png")
-    logger.auc_types(result)
-    print(result.auc())

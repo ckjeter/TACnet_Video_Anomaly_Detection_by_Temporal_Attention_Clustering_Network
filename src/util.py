@@ -8,6 +8,7 @@ from sklearn.metrics import fbeta_score, roc_auc_score, roc_curve, auc
 from matplotlib.patches import Rectangle
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
+import src.config as config 
 import os
 import ipdb
 
@@ -41,24 +42,31 @@ class AnomalyType(Scorer):
         self.count += 1
 
 class AnomalyVideo(Scorer):
-    def __init__(self, title, feature, predict, label, rawlabel):
+    def __init__(self, title, feature, predict, label, rawlabel, length):
         super().__init__()
         self.title = title
         self.feature = feature
         self.predict = predict
         self.label = label
         self.rawlabel = rawlabel
+        self.length = length
     def clusterplot(self):
         figure, ax = plt.subplots()
         downsample = TSNE(n_components=2).fit_transform(self.feature.squeeze(0).cpu().detach())
-        newlabel = [0] * self.feature.shape[1]
+        framelabel = [0] * len(self.predict)
         for i in range(0, 4, 2):
             if self.rawlabel[i] != -1:
-                newlabel[int(self.rawlabel[i]/16):int(self.rawlabel[i+1]/16)] \
-                = [1] * (int(self.rawlabel[i+1]/16)-int(self.rawlabel[i]/16))
+                framelabel[int(self.rawlabel[i]):int(self.rawlabel[i+1]+1)] \
+                = [1] * (int(self.rawlabel[i+1])-int(self.rawlabel[i]) + 1)
+        newlabel = []
         output_seg = []
-        for i in range(0, len(self.predict), 16):
-            output_seg.append(self.predict[i])
+        start = 0
+        for l in self.length:
+            if l == 0:
+                break
+            newlabel.append(framelabel[start * 16])
+            output_seg.append(self.predict[start * 16])
+            start += l.item()
         output_seg = np.array(output_seg)
         newlabel = np.array(newlabel)
         x = downsample.T[0]
@@ -98,7 +106,7 @@ class AnomalyResult():
         self.types = {}
         self.scorer = Scorer()
         self.bagscorer = Scorer()
-    def add(self, title, feature, predict, rawlabel):
+    def add(self, title, feature, predict, rawlabel, length):
         #compute label
         label = [0] * len(predict)
         for i in range(0, 4, 2):
@@ -111,7 +119,7 @@ class AnomalyResult():
         if category not in self.types:
             self.types[category] = AnomalyType(category)
         #add to predictions
-        self.videos[title] = AnomalyVideo(title, feature, predict, label, rawlabel)
+        self.videos[title] = AnomalyVideo(title, feature, predict, label, rawlabel, length)
         self.types[category].add(predict, label)
         self.scorer.add(predict, label)
     def addbag(self, predict, label):
@@ -145,35 +153,30 @@ class AnomalyResult():
 class logger():
     def __init__(self, args):
         self.args = args
-        self.root, self.log = logfile(args)
+        self.name, self.log = logfile(args)
         if args.savelog:
-            self.log.info("Saving log: {}".format(os.path.join("log", self.root + ".log")))
-            self.root = os.path.join('log', self.root)
+            self.log.info("Saving log: {}".format(os.path.join(config.root, "log", self.name + ".log")))
+            self.root = os.path.join(config.root, 'log', self.name)
             try:
                 os.mkdir(self.root)
+                self.log.info("create folder: {}".format(self.root))
             except:
-                self.log.warning("create folder failed")
-            if len(args.root) > 0:
-                self.writer = SummaryWriter(os.path.join('runs', args.root))
-            else:
-                self.writer = SummaryWriter(os.path.join('runs', self.root.split("/")[1]))
+                self.log.warning("folder already exists: {}".format(self.root))
+            writerpath = os.path.join('runs', self.name)
+            self.writer = SummaryWriter(writerpath)
+            self.log.info("create writer: {}".format(writerpath))
 
     def recordloss(self, losses, epoch):
         if self.args.savelog: 
             self.writer.add_scalar('bag_loss', losses[0], epoch)
-            self.writer.add_scalar('cluster_loss_far', losses[1], epoch)
-            self.writer.add_scalar('cluster_loss_close', losses[2], epoch)
-            self.writer.add_scalar('smooth_loss', losses[3], epoch)
-            self.writer.add_scalar('inner_anomaly_loss', losses[4], epoch)
-            self.writer.add_scalar('inner_normal_loss', losses[5], epoch)
+            self.writer.add_scalar('cluster_loss', losses[1], epoch)
+            self.writer.add_scalar('smooth_loss', losses[2], epoch)
+            self.writer.add_scalar('inner_anomaly_loss', losses[3], epoch)
         self.log.info(
-                "bag_loss: {:.4f}, smooth_loss: {:.4f}".format(losses[0], losses[3])
+                "bag: {:.4f}, smooth: {:.4f}, small: {:.4f}".format(losses[0], losses[2], losses[4])
         )
         self.log.info(
-                "cluster_far_loss: {:.4f}, cluster_close_loss: {:.4f}".format(losses[1], losses[2])
-        )
-        self.log.info(
-                "innerbag_anomaly_loss: {:.4f}, innerbag_normal_loss: {:.4f}".format(losses[4], losses[5])
+                "cluster: {:.4f}, innerbag: {:.4f}, maxmin: {:.4f}".format(losses[1], losses[3], losses[4])
         )
 
     def recordauc(self, result, epoch):
@@ -209,7 +212,7 @@ def logfile(args):
             datefmt=DATE_FORMAT,
             level=logging.INFO, 
             handlers = [
-                logging.FileHandler(os.path.join("log", root + ".log"), 'w', 'utf-8'),
+                logging.FileHandler(os.path.join(config.root, "log", root + ".log"), 'w', 'utf-8'),
                 logging.StreamHandler()
             ],
         )
@@ -224,5 +227,3 @@ def logfile(args):
         )
     logger = logging.getLogger()
     return root, logger
-
-        

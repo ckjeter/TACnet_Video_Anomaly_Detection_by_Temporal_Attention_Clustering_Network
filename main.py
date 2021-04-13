@@ -15,10 +15,10 @@ from pathlib import Path
 from tqdm import tqdm
 import ipdb
 
-from src.dataset import FrameFolderDataset, SegmentDataset
+from src.dataset import FrameFolderDataset, SegmentDataset, UCFCrime
 from src.pytorch_i3d import InceptionI3d
 from src.backbone import C3D, Attention
-from src.predict import predict
+from src.test import test
 from src.train import train
 import src.util as util
 import src.config as config
@@ -43,9 +43,9 @@ def main():
     else:
         backbone = backbone.to(device)
         net = net.to(device)
-
+    
     trainset = SegmentDataset(args.train_path)
-    trainloader = DataLoader(trainset, batch_size = 1, shuffle=True)
+    trainloader = DataLoader(trainset, batch_size = args.batch_size, shuffle=True)
         
     testset = SegmentDataset(args.test_path, test=True)
     testloader = DataLoader(testset, batch_size=1, shuffle=False)
@@ -60,7 +60,7 @@ def main():
         
         net, losses = train(net, trainloader, device, optimizer)
         with torch.no_grad():
-            result = predict(net, testloader, device, args)
+            result = test(net, testloader, device, args)
 
         logger.recordloss(losses, epoch)
         logger.recordauc(result, epoch)        
