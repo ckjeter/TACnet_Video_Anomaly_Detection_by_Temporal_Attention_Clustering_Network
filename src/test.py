@@ -35,10 +35,11 @@ import src.config as config
 def bagexpand(bag, length):
     instances = []
     for i, value in enumerate(bag):
-        instances += [float(value)] * (16 * length[i])
+        instances += [float(value)] * (length[i])
     return instances
 
-def test(net, loader, device, args):
+def test(model, loader, device, args, logger):
+    backbone, net = model
     net.eval()
     torch.manual_seed(777)
     maxauc = 0
@@ -46,8 +47,8 @@ def test(net, loader, device, args):
     for i, data in enumerate(loader):
         sys.stdout.write("{}/{}\r".format(i, len(loader)))
         sys.stdout.flush()
-        title, feature, label, length = data
-        feature = feature.to(device)
+        title, imgs, label, length = data
+        imgs = imgs.to(device)
         label = label[0]
         length = length[0]
 
@@ -55,6 +56,7 @@ def test(net, loader, device, args):
             baglabel = 0
         else:
             baglabel = 1
+        feature = backbone(imgs.squeeze(0)).unsqueeze(0)
         feature, clusters, output_seg, bagoutput, A = net(feature)
         bagoutput = torch.sum(bagoutput, 1)
         result.addbag(bagoutput.view(-1).tolist(), [baglabel])
@@ -63,17 +65,15 @@ def test(net, loader, device, args):
         #atten_weight = A
         #A = net.classification(feature).view(-1)
         #A = net.maxminnorm(A * atten_weight)
-        if bagoutput.item() < 0.5:
-            framepredict = [0] * (sum(length).item()) * 16
+        if bagoutput.item() < 0:
+            framepredict = [0] * (sum(length).item())
         else:
             framepredict = bagexpand(output_seg[0].cpu().tolist(), length)
         result.add(title[0], feature, framepredict, label, length)
         if args.p_graph:
             figure = result.predictplot(title[0])
-            figure.savefig(os.path.join('image', 'performance', title[0]+'.png'))
-            plt.close(figure)
+            logger.savefig(figure, os.path.join('performance', title[0] + '.png'))
         if args.c_graph:
             figure = result.clusterplot(title[0])
-            figure.savefig(os.path.join('image', 'cluster', title[0]+'.png'))
-            plt.close(figure)
+            logger.savefig(figure, os.path.join('cluster', title[0] + '.png'))
     return result 

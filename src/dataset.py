@@ -37,13 +37,14 @@ class UCFCrime(Dataset):
                 , dtype=str)
             for data in datalist:
                 video, category, f1, f2, f3, f4 = data
+                self.title.append(self.gettitle(video))
                 if category == 'Normal':
                     video = os.path.join("Testing_Normal_Videos_Anomaly", video)
                 else:
                     video = os.path.join(category, video)
                 input_path = self.path_generate(config.root, video)
                 self.video.append(input_path)
-                self.label.append((int(f1), int(f2), int(f3), int(f4)))
+                self.label.append(np.array([int(f1), int(f2), int(f3), int(f4)]))
         self.mean = np.load('models/c3d_mean.npy') #N, C, T, H, W
     def __getitem__(self, index):
         title = self.title[index]
@@ -58,17 +59,20 @@ class UCFCrime(Dataset):
         sliceclips = []
         length = [len(c) for c in clips]
         for c in clips:
-            clip = [cc[0] for cc in np.array_split(np.array(c), 16)]
+            try:
+                clip = [cc[0] for cc in np.array_split(c, 16)]
+            except:
+                clip = c
             imgs = np.array([np.array(Image.open(path).resize((171, 128), Image.BICUBIC), dtype=np.float) for path in clip])
             imgs = imgs.transpose(3, 0, 1, 2) # (T, H, W, C) => (C, T, H, W)
             #imgs = imgs[:, :, 8:120, 30:142]
             imgs = (imgs - self.mean[0][:, :imgs.shape[1], :, :])[:, :, 8:120, 30:142]
             if imgs.shape[1] < config.segment_length:
-                imgs = np.pad(imgs, ((0, 0), (0, self.clip_size - imgs.shape[1]), (0, 0), (0, 0)), 'constant')
+                imgs = np.pad(imgs, ((0, 0), (0, config.segment_length - imgs.shape[1]), (0, 0), (0, 0)), 'constant')
             imgs = torch.tensor(imgs, dtype=torch.float32)
             sliceclips.append(imgs)
         sliceclips = np.stack(sliceclips, axis=0)
-        return sliceclips, length
+        return sliceclips, np.array(length)
     def gettitle(self, video):
         video = os.path.basename(video)
         if video.find("Normal") >= 0:
@@ -83,7 +87,7 @@ class UCFCrime(Dataset):
             input_path = os.path.join(root, "Anomaly-Videos", video.split(".")[0], 'frame')
         return input_path
     def __len__(self):
-        return len(self.frames)
+        return len(self.title)
 
 class FrameFolderDataset(Dataset):
     def __init__(self, folder_dir, clip_size=config.segment_length):

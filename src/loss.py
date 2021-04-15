@@ -38,8 +38,8 @@ class InnerBagLoss(nn.Module):
         c1, c2 = clusters
         loss = 0
         for i in range(label.shape[0]):
-            c_a = c1[i] if c1[i].max() >= c2[i].max() else c2[i]
-            c_n = c2[i] if c2[i].max() < c1[i].max() else c1[i]
+            c_a = c1[i] if c1[i].mean() >= c2[i].mean() else c2[i]
+            c_n = c2[i] if c2[i].mean() < c1[i].mean() else c1[i]
             maxscore = max(c1[i].max(), c2[i].max())
             minscore = min(c1[i].min(), c2[i].min())
             if label[i] == 0:

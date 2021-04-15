@@ -28,14 +28,15 @@ from src.loss import ClusterLoss, SmoothLoss, MaxminLoss, InnerBagLoss, SmallLos
 from src.util import Averager
 import src.config as config
         
-def train(net, trainloader, device, optimizer):
-    net.train()
+def train(model, trainloader, device, optimizer):
+    backbone, net = model
     bagLoss = nn.BCELoss().to(device)
     clusterLoss = ClusterLoss(device).to(device)
     smoothLoss = SmoothLoss().to(device)
     innerbagLoss = InnerBagLoss(device).to(device)
     maxminLoss = MaxminLoss().to(device)
     smallLoss = SmallLoss().to(device)
+
     bag_loss_count = Averager()
     cluster_minloss_count = Averager()
     cluster_maxloss_count = Averager()
@@ -49,10 +50,13 @@ def train(net, trainloader, device, optimizer):
     for i, data in enumerate(trainloader):
         sys.stdout.write("    Train Batch: {}/{}\r".format(i, len(trainloader)))
         sys.stdout.flush()
-        title, feature, label, length = data
-        feature = feature.to(device)
+        title, imgs, label, length = data
+        imgs = imgs.to(device)
         #feature = torch.nan_to_num(feature)
         label = label.to(device)
+
+        batch_size = imgs.shape[0]
+        feature = backbone(imgs.view(-1, 3, 16, 112, 112)).view(batch_size, 32, -1)
         feature, clusters, output_seg, output, A = net(feature)
         output = torch.sum(output, 1)
         #output_seg = net.maxminnorm(A)
@@ -76,7 +80,7 @@ def train(net, trainloader, device, optimizer):
             cluster_maxloss_count.add(cluster_loss.item())
             innerloss_anomaly_count.add(innerbag_loss.item())
         '''
-        parameter = [1, 0, 0.3, 0.3, 0.1, 0.001]
+        parameter = [1, 0.1, 0.3, 0.1, 0.05, 0.001]
         losses = [bag_loss, cluster_loss, innerbag_loss, maxmin_loss, smooth_loss, small_loss]
         loss = sum([p * l for p, l in zip(parameter, losses)])
 
@@ -90,7 +94,7 @@ def train(net, trainloader, device, optimizer):
     '''
     losses = [bag_loss_count.item(), cluster_loss_count.item(), smooth_loss_count.item(),
                 maxminloss_count.item(), innerloss_count.item(), small_loss.item()]
-    return net, losses
+    return [backbone, net], losses
 
 if __name__ == '__main__':
     pass

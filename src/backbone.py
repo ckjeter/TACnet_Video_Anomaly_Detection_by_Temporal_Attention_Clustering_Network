@@ -10,7 +10,7 @@ class Attention(nn.Module):
         super(Attention, self).__init__()
         self.attention_type = args.attention_type
         self.device = device
-        self.L = 1024
+        self.L = 4096
         self.D = 256
         self.mlp1 = nn.Sequential(
             nn.Linear(4096, 4096),
@@ -56,7 +56,7 @@ class Attention(nn.Module):
 
     def forward(self, input):
         feature = torch.nan_to_num(input)
-        feature = self.mlp1(feature)
+        #feature = self.mlp1(feature)
         #feature, hidden = self.rnn(feature)
         #feature = self.tsn(feature.transpose(1, 2)).transpose(1, 2)
         #feature = self.mlp1(feature)

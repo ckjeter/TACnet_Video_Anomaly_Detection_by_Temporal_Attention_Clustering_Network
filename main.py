@@ -34,6 +34,16 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logger.info(device)
 
+    #----------Prepare Datasets----------
+    #trainset = SegmentDataset(args.train_path)
+    trainset = UCFCrime(test=False)
+    trainloader = DataLoader(trainset, batch_size = args.batch_size, shuffle=True)
+        
+    #testset = SegmentDataset(args.test_path, test=True)
+    testset = UCFCrime(test=True)
+    testloader = DataLoader(testset, batch_size=1, shuffle=False)
+    
+    #----------Prepare Models----------
     backbone = C3D()
     backbone.load_state_dict(torch.load("models/c3d.pickle"))
     net = Attention(args, device)
@@ -44,23 +54,22 @@ def main():
         backbone = backbone.to(device)
         net = net.to(device)
     
-    trainset = SegmentDataset(args.train_path)
-    trainloader = DataLoader(trainset, batch_size = args.batch_size, shuffle=True)
-        
-    testset = SegmentDataset(args.test_path, test=True)
-    testloader = DataLoader(testset, batch_size=1, shuffle=False)
-
-    optimizer = optim.AdamW(net.parameters(), lr=args.lr)
+    #----------Prepare Training Shit----------
+    optimizer = optim.AdamW([
+        {'params': backbone.parameters(), 'lr': args.lr * 0.1},
+        {'params': net.parameters(), 'lr': args.lr}
+    ])
     #optimizer = optim.SGD(net.parameters(), momentum=0.5, lr=args.lr)
     scheduler = MultiStepLR(optimizer, [10, 20, 30], gamma=0.1)
-
+    
+    model = [backbone, net]
     maxauc = 0
     for epoch in range(args.epoch):
         logger.info("Epoch: {}/{}".format(epoch, args.epoch))
         
-        net, losses = train(net, trainloader, device, optimizer)
+        model, losses = train(model, trainloader, device, optimizer)
         with torch.no_grad():
-            result = test(net, testloader, device, args)
+            result = test(model, testloader, device, args, logger)
 
         logger.recordloss(losses, epoch)
         logger.recordauc(result, epoch)        
@@ -68,7 +77,7 @@ def main():
         if result.auc() > maxauc:
             maxauc = result.auc()
         if args.savelog:
-            logger.savemodel(net, epoch)
+            logger.savemodel(model, epoch)
         scheduler.step()
     logger.info("best preformance: {:.4f}".format(maxauc))
 

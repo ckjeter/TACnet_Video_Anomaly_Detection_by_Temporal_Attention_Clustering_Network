@@ -64,8 +64,8 @@ class AnomalyVideo(Scorer):
         for l in self.length:
             if l == 0:
                 break
-            newlabel.append(framelabel[start * 16])
-            output_seg.append(self.predict[start * 16])
+            newlabel.append(framelabel[start])
+            output_seg.append(self.predict[start])
             start += l.item()
         output_seg = np.array(output_seg)
         newlabel = np.array(newlabel)
@@ -110,8 +110,12 @@ class AnomalyResult():
         #compute label
         label = [0] * len(predict)
         for i in range(0, 4, 2):
-            if label[i] != -1:
-                label[rawlabel[i]:rawlabel[i+1]] = [1] * (rawlabel[i+1]-rawlabel[i])
+            if rawlabel[i].item() != -1:
+                start = max(0, rawlabel[i].item()-1)
+                end = min(len(predict), rawlabel[i+1].item())
+                label[start:end] = [1] * (end - start)
+                if len(label) != len(predict):
+                    ipdb.set_trace()
         #detect category
         category = title[:-3]
         if category.find("Normal") >= 0:
@@ -129,18 +133,20 @@ class AnomalyResult():
     def aucbag(self):
         return self.bagscorer.auc()
     def roccurve(self):
-        fpr, tpr, t = roc_curve(self.scorer.label, self.scorer.predict)
-        figure, ax = plt.subplots()
-        plt.plot(fpr, tpr, color='darkorange',
-                         lw=2, label='ROC curve (area = %0.2f)' % self.scorer.auc())
-        plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
-        plt.xlim([0.0, 1.0])
-        plt.ylim([0.0, 1.05])
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-        plt.title('ROC curve')
-        plt.legend(loc="lower right")
-        return figure
+        def draw(scorer, title='ROC curve'):
+            fpr, tpr, t = roc_curve(scorer.label, scorer.predict)
+            figure, ax = plt.subplots()
+            plt.plot(fpr, tpr, color='darkorange',
+                             lw=2, label='ROC curve (area = %0.2f)' % scorer.auc())
+            plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+            plt.xlim([0.0, 1.0])
+            plt.ylim([0.0, 1.0])
+            plt.xlabel('False Positive Rate')
+            plt.ylabel('True Positive Rate')
+            plt.title(title)
+            plt.legend(loc="lower right")
+            return figure
+        return draw(self.scorer), draw(self.bagscorer, 'Bag ROC curve')
     def clusterplot(self, title):
         #figure = self.videos[title].clusterplot()
         #figure.savefig(title + "_features.png")
@@ -171,12 +177,12 @@ class logger():
             self.writer.add_scalar('bag_loss', losses[0], epoch)
             self.writer.add_scalar('cluster_loss', losses[1], epoch)
             self.writer.add_scalar('smooth_loss', losses[2], epoch)
-            self.writer.add_scalar('inner_anomaly_loss', losses[3], epoch)
+            self.writer.add_scalar('inner_anomaly_loss', losses[4], epoch)
         self.log.info(
-                "bag: {:.4f}, smooth: {:.4f}, small: {:.4f}".format(losses[0], losses[2], losses[4])
+                "bag: {:.4f}, smooth: {:.4f}, small: {:.4f}".format(losses[0], losses[2], losses[5])
         )
         self.log.info(
-                "cluster: {:.4f}, innerbag: {:.4f}, maxmin: {:.4f}".format(losses[1], losses[3], losses[4])
+                "cluster: {:.4f}, innerbag: {:.4f}, maxmin: {:.4f}".format(losses[1], losses[4], losses[3])
         )
 
     def recordauc(self, result, epoch):
@@ -191,13 +197,25 @@ class logger():
                 print(k, v.auc(), v.count)
             else:
                 print(k, v.count)
-    def savemodel(self, net, epoch):
-        savepath = os.path.join(self.root, str(epoch) + '.pth')
-        self.log.info("    Save model: {}".format(savepath))
-        torch.save(net.state_dict(), savepath)
-
+    def savemodel(self, model, epoch):
+        backbone, net = model
+        savepath_C3D = os.path.join(self.root, str(epoch) + 'C3D.pth')
+        savepath_net = os.path.join(self.root, str(epoch) + '.pth')
+        self.log.info("    Save model: {}".format(savepath_C3D))
+        self.log.info("    Save model: {}".format(savepath_net))
+        torch.save(backbone.state_dict(), savepath_C3D)
+        torch.save(net.state_dict(), savepath_net)
     def info(self, message):
         self.log.info(message)
+    def savefig(self, figure, path):
+        folder = os.path.join('image', self.name)
+        if not os.path.exists(folder):
+            os.mkdir(folder)
+        path = os.path.join(folder, path)
+        if not os.path.exists(os.path.dirname(path)):
+            os.mkdir(os.path.dirname(path))
+        figure.savefig(path)
+        plt.close(figure)
 
 def logfile(args):
     if len(args.root) > 0:
