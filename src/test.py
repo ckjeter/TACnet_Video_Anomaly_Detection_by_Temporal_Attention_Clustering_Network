@@ -65,7 +65,7 @@ def test(model, loader, device, args, logger):
         #atten_weight = A
         #A = net.classification(feature).view(-1)
         #A = net.maxminnorm(A * atten_weight)
-        if bagoutput.item() < 0:
+        if bagoutput.item() < -1:
             framepredict = [0] * (sum(length).item())
         else:
             framepredict = bagexpand(output_seg[0].cpu().tolist(), length)

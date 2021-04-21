@@ -171,7 +171,8 @@ class logger():
             writerpath = os.path.join('runs', self.name)
             self.writer = SummaryWriter(writerpath)
             self.log.info("create writer: {}".format(writerpath))
-
+    def recordparameter(self):
+        self.log.info("loss = {0[0]}*bag+{0[1]}*cluster+{0[2]}*innerbag+{0[3]}*maxmin+{0[4]}*smooth+{0[5]}*small".format(config.loss_parameter))
     def recordloss(self, losses, epoch):
         if self.args.savelog: 
             self.writer.add_scalar('bag_loss', losses[0], epoch)
@@ -220,6 +221,8 @@ class logger():
 def logfile(args):
     if len(args.root) > 0:
         root = args.root
+    elif len(args.model_path) > 0:
+        root = os.path.basename(os.path.dirname(args.model_path))
     else:
         root = str(datetime.now().strftime('%m%d_%H:%M'))
     FORMAT = '%(asctime)s %(levelname)s: %(message)s'
@@ -230,7 +233,7 @@ def logfile(args):
             datefmt=DATE_FORMAT,
             level=logging.INFO, 
             handlers = [
-                logging.FileHandler(os.path.join(config.root, "log", root + ".log"), 'w', 'utf-8'),
+                logging.FileHandler(os.path.join(config.root, "log", root + ".log"), 'a', 'utf-8'),
                 logging.StreamHandler()
             ],
         )

@@ -80,7 +80,7 @@ def train(model, trainloader, device, optimizer):
             cluster_maxloss_count.add(cluster_loss.item())
             innerloss_anomaly_count.add(innerbag_loss.item())
         '''
-        parameter = [1, 0.1, 0.3, 0.1, 0.05, 0.001]
+        parameter = config.loss_parameter
         losses = [bag_loss, cluster_loss, innerbag_loss, maxmin_loss, smooth_loss, small_loss]
         loss = sum([p * l for p, l in zip(parameter, losses)])
 

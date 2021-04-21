@@ -84,7 +84,7 @@ class Attention(nn.Module):
             #f = feature_dirty[i][~torch.any(feature_dirty[i].isnan(),dim=1)]
             f = feature[i]
             cluster, centers = kmeans(
-                X=f, num_clusters=2, distance='euclidean', device=self.device)
+                X=f, num_clusters=2, distance='euclidean', device=self.device, iter_limit=100)
             #output_seg = torch.sigmoid(output_seg.view(-1))
             c1 = torch.nonzero(cluster==0).view(-1).to(self.device)
             c2 = torch.nonzero(cluster!=0).view(-1).to(self.device)
