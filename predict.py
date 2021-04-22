@@ -51,8 +51,8 @@ if __name__ == "__main__":
         result = test([backbone, net], testloader, device, args, logger)
     try:
         roc, roc_bag = result.roccurve()
-        roc.savefig("ROC.png")
-        roc_bag.savefig("BagROC.png")
+        logger.savefig(roc, "ROC.png")
+        logger.savefig(roc_bag, "BagROC.png")
     except:
         ipdb.set_trace()
     logger.auc_types(result)
