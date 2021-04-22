@@ -82,20 +82,26 @@ class AnomalyVideo(Scorer):
         plt.legend()
         return figure
     def predictplot(self):
-        figure, ax = plt.subplots()
+        figure, ax = plt.subplots(figsize=(8, 6))
         plt.plot(self.predict)
         plt.title(self.title)
         plt.ylim([0, 1])
         plt.xlabel('Frame number')
         plt.ylabel('Anomaly score')
+        plt.xticks([0, len(self.predict)-1])
+        ticks = [0]
         for i in range(0, len(self.rawlabel), 2):
             if self.rawlabel[i] != -1:
                 ax.add_patch(Rectangle((self.rawlabel[i], 0)
                     , self.rawlabel[i+1]-self.rawlabel[i], 1, color='red', alpha=0.5))
+                ticks.append(self.rawlabel[i])
+                ticks.append(self.rawlabel[i+1])
+        ticks.append(len(self.predict)-1)
+        plt.xticks(ticks)
         try:
             props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
             text = "AUC: " + str(self.auc())[:4]
-            plt.text(0, 1.1, text, bbox=props)
+            plt.text(0, 1.05, text, bbox=props)
         except:
             pass
         return figure
