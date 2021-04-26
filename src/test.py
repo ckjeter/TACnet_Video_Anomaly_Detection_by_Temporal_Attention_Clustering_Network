@@ -41,6 +41,7 @@ def bagexpand(bag, length):
 def test(model, loader, device, args, logger):
     backbone, net = model
     net.eval()
+    backbone.eval()
     torch.manual_seed(777)
     maxauc = 0
     result = AnomalyResult()

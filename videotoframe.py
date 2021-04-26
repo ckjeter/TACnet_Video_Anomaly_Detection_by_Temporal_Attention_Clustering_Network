@@ -1,6 +1,7 @@
 import cv2
 import ipdb
 import numpy as np
+import imutils
 import os
 import argparse
 import sys
@@ -20,8 +21,17 @@ class converter():
             os.system("mkdir " + path)
             return 1
 
-    def reset(self):
-        os.system("rm -rf " + self.dir)
+    def reset(self, args):
+        target = self.dir
+        if args.frame:
+            os.system("rm -rf " + os.path.join(target, 'frame'))
+        if args.BG_sub:
+            os.system("rm -rf " + os.path.join(target, 'BG_sub'))
+        if args.optical:
+            os.system("rm -rf " + os.path.join(target, "optical"))
+        if args.moving:
+            os.system("rm -rf " + os.path.join(target, "moving"))
+
 
     def toframe(self):
         path = os.path.join(self.dir, 'frame')
@@ -38,8 +48,8 @@ class converter():
             count += 1
         vidcap.release()
 
-    def BG_sub(self, mode='MOG2'):
-        path = os.path.join(self.dir, mode)
+    def BG_sub(self, mode='KNN'):
+        path = os.path.join(self.dir, "BG_sub")
         self.mkdir(path)
         vidcap = cv2.VideoCapture(self.videopath)
         if mode == 'MOG2':
@@ -52,55 +62,77 @@ class converter():
             if frame is None:
                 break
             fgMask = backSub.apply(frame)
-            #cv2.rectangle(frame, (10, 2), (100,20), (255,255,255), -1)
+            #cv2.rectangle(*frame, (10, 2), (100,20), (255,255,255), -1)
             #cv2.putText(frame, str(vidcap.get(cv2.CAP_PROP_POS_FRAMES)), (15, 15),
             #           cv2.FONT_HERSHEY_SIMPLEX, 0.5 , (0,0,0))
-            frame = cv2.bitwise_and(frame, frame, mask=fgMask)
-            cv2.imwrite(os.path.join(self.dir, mode, "%d.jpg" % count), frame)
+            mask = cv2.bitwise_and(frame, frame, mask=fgMask)
+            cnts = cv2.findContours(cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            cnts = imutils.grab_contours(cnts)
+            mask_all = np.zeros((frame.shape[0], frame.shape[1], 1), dtype=np.uint8)
+            for c in cnts:
+                # if the contour is too small, ignore it
+                if cv2.contourArea(c) < 500:
+                    continue
+                # compute the bounding box for the contour, draw it on the frame,
+                # and update the text
+                (x, y, w, h) = cv2.boundingRect(c)
+                mask_all[y:y+h, x:x+w, :] = 255
+            mask = cv2.bitwise_and(frame, frame, mask=mask_all)
+            frame = cv2.GaussianBlur(frame, (21, 21), 0)
+            BG = cv2.bitwise_and(frame, frame, mask=cv2.bitwise_not(mask_all, mask_all))
+            frame = cv2.add(mask, BG)
+            cv2.imwrite(os.path.join(self.dir, 'BG_sub', "%d.jpg" % count), frame)
             count += 1
         vidcap.release()        
     def moving_average(self):
-        self.mkdir('moving')
+        path = os.path.join(self.dir, "moving")
+        self.mkdir(path)
         vidcap = cv2.VideoCapture(self.videopath)
-        ret, frame = vidcap.read()
-        avg = cv2.blur(frame, (4, 4))
-        avg_float = np.float32(avg)
-
+        firstFrame = None
         count = 0
         while(1):
             ret, frame = vidcap.read()
-            if ret == False:
+            # if the frame could not be grabbed, then we have reached the end
+            # of the video
+            if frame is None:
                 break
-            blur = cv2.blur(frame, (4, 4))
-            diff = cv2.absdiff(avg, blur)
-            gray = cv2.cvtColor(diff, cv2.COLOR_BGR2GRAY)
-            ret, thresh = cv2.threshold(gray, 25, 255, cv2.THRESH_BINARY)
-            kernel = np.ones((5, 5), np.uint8)
-            thresh = cv2.morphologyEx(
-                thresh, cv2.MORPH_OPEN, kernel, iterations=2)
-            thresh = cv2.morphologyEx(
-                thresh, cv2.MORPH_CLOSE, kernel, iterations=2)
-
-            cntImg, cnts, _ = cv2.findContours(
-                thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
+            # resize the frame, convert it to grayscale, and blur it
+            frame = imutils.resize(frame, width=500)
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            gray = cv2.GaussianBlur(gray, (21, 21), 0)
+            # if the first frame is None, initialize it
+            if firstFrame is None:
+                firstFrame = gray
+                firstFrame = cv2.blur(firstFrame, (4, 4))
+                avg_float = np.float32(firstFrame)
+                continue
+            # compute the absolute difference between the current frame and
+            # first frame
+            frameDelta = cv2.absdiff(firstFrame, gray)
+            thresh = cv2.threshold(frameDelta, 25, 255, cv2.THRESH_BINARY)[1]
+            # dilate the thresholded image to fill in holes, then find contours
+            # on thresholded image
+            thresh = cv2.dilate(thresh, None, iterations=2)
+            cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            cnts = imutils.grab_contours(cnts)
+            # loop over the contours
             for c in cnts:
+                # if the contour is too small, ignore it
                 if cv2.contourArea(c) < 500:
                     continue
-                # if detect anything...
+                # compute the bounding box for the contour, draw it on the frame,
+                # and update the text
                 (x, y, w, h) = cv2.boundingRect(c)
                 cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-
-            # cv2.drawContours(frame, cnts, -1, (0, 255, 255), 2)
-            cv2.imwrite(self.dir + "/moving/%d.png" %
-                        count, frame)     # save frame as JPEG file
-            cv2.accumulateWeighted(blur, avg_float, 0.01)
-            avg = cv2.convertScaleAbs(avg_float)
+            cv2.imwrite(os.path.join(self.dir, 'moving', "%d.jpg" % count), frame)
+            cv2.accumulateWeighted(gray, avg_float, 0.01)
+            firstFrame = cv2.convertScaleAbs(avg_float)
             count += 1
         vidcap.release()
 
     def optical(self):
-        self.mkdir('opt')
+        path = os.path.join(self.dir, 'optical')
+        self.mkdir(path)
         vidcap = cv2.VideoCapture(self.videopath)
         ret, frame1 = vidcap.read()
         prvs = cv2.cvtColor(frame1, cv2.COLOR_BGR2GRAY)
@@ -130,6 +162,10 @@ class converter():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--reset", action="store_true", help="reset folders")
+    parser.add_argument("--frame", action="store_true")
+    parser.add_argument("--BG_sub", action="store_true")
+    parser.add_argument("--optical", action="store_true")
+    parser.add_argument("--moving", action="store_true")
     args = parser.parse_args()
     root = config.root
     data_list = np.genfromtxt(os.path.join(root, "Anomaly_Train.txt"), dtype=str)
@@ -140,10 +176,17 @@ if __name__ == '__main__':
             convert = converter(os.path.join(root, "Anomaly-Videos", video))
 
         if args.reset:
-            convert.reset()
+            convert.reset(args)
         else:
             print(video)
-            convert.toframe()
+            if args.frame:
+                convert.toframe()
+            if args.BG_sub:
+                convert.BG_sub()
+            if args.optical:
+                convert.optical()
+            if args.moving:
+                convert.moving_average()
     data_list_test = np.genfromtxt(
             os.path.join(root, "Temporal_Anomaly_Annotation_for_Testing_Videos.txt"), dtype=str
     )
@@ -153,6 +196,16 @@ if __name__ == '__main__':
             convert = converter(os.path.join(root, 'Testing_Normal_Videos_Anomaly', video))
         else:
             convert = converter(os.path.join(root, 'Anomaly-Videos', category, video))
-        print(video)
-        convert.toframe()
+        if args.reset:
+            convert.reset(args)
+        else:
+            print(video)
+            if args.frame:
+                convert.toframe()
+            if args.BG_sub:
+                convert.BG_sub()
+            if args.optical:
+                convert.optical()
+            if args.moving:
+                convert.moving_average()
         

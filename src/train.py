@@ -30,6 +30,8 @@ import src.config as config
         
 def train(model, trainloader, device, optimizer):
     backbone, net = model
+    backbone.train()
+    net.train()
     bagLoss = nn.BCELoss().to(device)
     clusterLoss = ClusterLoss(device).to(device)
     smoothLoss = SmoothLoss().to(device)

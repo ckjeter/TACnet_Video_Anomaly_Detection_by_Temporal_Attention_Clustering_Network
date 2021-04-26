@@ -78,7 +78,6 @@ class SmoothLoss(nn.Module):
         self.quantize = quantize
     def forward(self, output_seg):
         loss = 0
-        '''
         for A in output_seg:
             loss += (A[0] - A[1])**2
             for i in range(1, len(A)-1):
@@ -91,6 +90,7 @@ class SmoothLoss(nn.Module):
                 prob = x_count / len(A)
                 if prob != 0:
                     loss += -1 * prob * torch.log2(prob)
+        '''
         return loss
 
 class SmallLoss(nn.Module):
