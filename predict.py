@@ -44,7 +44,7 @@ if __name__ == "__main__":
     net.load_state_dict(torch.load(args.model_path))
     logger.name = os.path.basename(os.path.dirname(args.model_path))
     #testset = SegmentDataset(args.test_path, test=True)
-    testset = UCFCrime(test=True)
+    testset = UCFCrime(test=True, target=args.target)
     testloader = DataLoader(testset, batch_size=1, shuffle=False)
 
     with torch.no_grad():

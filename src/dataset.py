@@ -13,7 +13,8 @@ import src.config as config
 from tqdm import tqdm
 
 class UCFCrime(Dataset):
-    def __init__(self, test=False):
+    def __init__(self, test=False, target = 'frame'):
+        self.target = target
         self.test = test
         self.root = config.root           
         self.video = []
@@ -82,9 +83,9 @@ class UCFCrime(Dataset):
         return title
     def path_generate(self, root, video):
         if video.find("Normal") >= 0:
-            input_path = os.path.join(root, video.split(".")[0], 'frame')
+            input_path = os.path.join(root, video.split(".")[0], self.target)
         else:
-            input_path = os.path.join(root, "Anomaly-Videos", video.split(".")[0], 'frame')
+            input_path = os.path.join(root, "Anomaly-Videos", video.split(".")[0], self.target)
         return input_path
     def __len__(self):
         return len(self.title)

@@ -36,11 +36,11 @@ def main():
 
     #----------Prepare Datasets----------
     #trainset = SegmentDataset(args.train_path)
-    trainset = UCFCrime(test=False)
+    trainset = UCFCrime(test=False, target = args.target)
     trainloader = DataLoader(trainset, batch_size = args.batch_size, shuffle=True)
         
     #testset = SegmentDataset(args.test_path, test=True)
-    testset = UCFCrime(test=True)
+    testset = UCFCrime(test=True, target = args.target)
     testloader = DataLoader(testset, batch_size=1, shuffle=False)
     
     #----------Prepare Models----------

@@ -38,11 +38,7 @@ class InnerBagLoss(nn.Module):
         c1, c2 = clusters
         loss = 0
         for i in range(label.shape[0]):
-            c_a = c1[i] if c1[i].mean() >= c2[i].mean() else c2[i]
-            c_n = c2[i] if c2[i].mean() < c1[i].mean() else c1[i]
-            maxscore = max(c1[i].max(), c2[i].max())
-            minscore = min(c1[i].min(), c2[i].min())
-            if label[i] == 0:
+            if len(c1[i]) == 0 or len(c2[i]) == 0 or label[i] == 0:
                 #normal
                 predict = torch.cat((c1[i], c2[i]), dim=0)
                 zerolabel = torch.zeros(c1[i].shape[0]+c2[i].shape[0]).to(self.device)
@@ -50,6 +46,10 @@ class InnerBagLoss(nn.Module):
                 #loss += abs(maxscore - minscore)
                 #return abs(c1.mean() - c2.mean())
             else:
+                c_a = c1[i] if c1[i].mean() >= c2[i].mean() else c2[i]
+                c_n = c2[i] if c2[i].mean() < c1[i].mean() else c1[i]
+                maxscore = max(c1[i].max(), c2[i].max())
+                minscore = min(c1[i].min(), c2[i].min())
                 #anomaly
                 onelabel = torch.ones(c_a.shape[0]).to(self.device)
                 #zerolabel = torch.zeros(c_n.shape[0]).to(self.device)
