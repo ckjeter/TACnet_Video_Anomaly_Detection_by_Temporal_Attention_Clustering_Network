@@ -67,7 +67,7 @@ def main():
         {'params': net.parameters(), 'lr': args.lr}
     ])
     #optimizer = optim.SGD(net.parameters(), momentum=0.5, lr=args.lr)
-    scheduler = MultiStepLR(optimizer, [5, 15, 30], gamma=0.1)
+    scheduler = MultiStepLR(optimizer, [15, 20, 30], gamma=0.1)
     
     logger.recordparameter()
     model = [backbone, net]
