@@ -191,6 +191,9 @@ class logger():
         self.log.info(
                 "cluster: {:.4f}, innerbag: {:.4f}, maxmin: {:.4f}".format(losses[1], losses[4], losses[3])
         )
+        self.log.info(
+                "output: {:.4f}".format(losses[6])
+        )
 
     def recordauc(self, result, epoch):
         if self.args.savelog:

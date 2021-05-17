@@ -24,7 +24,7 @@ from tensorboardX import SummaryWriter
 from src.dataset import FrameFolderDataset, SegmentDataset
 from src.pytorch_i3d import InceptionI3d
 from src.backbone import C3D, Attention
-from src.loss import ClusterLoss, SmoothLoss, MaxminLoss, InnerBagLoss, SmallLoss
+from src.loss import ClusterLoss, SmoothLoss, MaxminLoss, InnerBagLoss, SmallLoss, OutputLoss
 from src.util import Averager
 import src.config as config
         
@@ -38,6 +38,7 @@ def train(model, trainloader, device, optimizer):
     innerbagLoss = InnerBagLoss(device).to(device)
     maxminLoss = MaxminLoss().to(device)
     smallLoss = SmallLoss().to(device)
+    outputLoss = OutputLoss().to(device)
 
     bag_loss_count = Averager()
     cluster_minloss_count = Averager()
@@ -48,6 +49,7 @@ def train(model, trainloader, device, optimizer):
     maxminloss_count = Averager()
     innerloss_count = Averager()
     smooth_loss_count = Averager()
+    output_loss_count = Averager()
 
     for i, data in enumerate(trainloader):
         sys.stdout.write("    Train Batch: {}/{}\r".format(i, len(trainloader)))
@@ -59,8 +61,8 @@ def train(model, trainloader, device, optimizer):
 
         batch_size = imgs.shape[0]
         feature = backbone(imgs.view(-1, 3, 16, 112, 112)).view(batch_size, 32, -1)
-        feature, clusters, output_seg, output, A = net(feature)
-        output = torch.sum(output, 1)
+        feature, clusters, output_seg, output_bag, A = net(feature)
+        output = torch.mean(output_bag, 1)
         #output_seg = net.maxminnorm(A)
         bag_loss = bagLoss(output.view(-1), label.view(-1).type(torch.float))
         cluster_loss = clusterLoss(feature, label)
@@ -68,12 +70,14 @@ def train(model, trainloader, device, optimizer):
         smooth_loss = smoothLoss(output_seg)
         small_loss = smallLoss(output_seg)
         maxmin_loss = maxminLoss(output_seg, label)
+        output_loss = outputLoss(output_bag)
 
         bag_loss_count.add(bag_loss.item())
         smooth_loss_count.add(smooth_loss.item())
         cluster_loss_count.add(cluster_loss.item())
         innerloss_count.add(innerbag_loss.item())
         maxminloss_count.add(maxmin_loss.item())
+        output_loss_count.add(output_loss.item())
         '''
         if label.item() == 0:
             cluster_minloss_count.add(cluster_loss.item())
@@ -83,9 +87,8 @@ def train(model, trainloader, device, optimizer):
             innerloss_anomaly_count.add(innerbag_loss.item())
         '''
         parameter = config.loss_parameter
-        losses = [bag_loss, cluster_loss, innerbag_loss, maxmin_loss, smooth_loss, small_loss]
+        losses = [bag_loss, cluster_loss, innerbag_loss, maxmin_loss, smooth_loss, small_loss, output_loss]
         loss = sum([p * l for p, l in zip(parameter, losses)])
-
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -95,7 +98,7 @@ def train(model, trainloader, device, optimizer):
                 innerloss_anomaly_count.item(), innerloss_normal_count.item()]
     '''
     losses = [bag_loss_count.item(), cluster_loss_count.item(), smooth_loss_count.item(),
-                maxminloss_count.item(), innerloss_count.item(), small_loss.item()]
+                maxminloss_count.item(), innerloss_count.item(), small_loss.item(), output_loss.item()]
     return [backbone, net], losses
 
 if __name__ == '__main__':

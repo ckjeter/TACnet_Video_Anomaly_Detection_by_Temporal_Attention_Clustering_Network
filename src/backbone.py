@@ -10,7 +10,7 @@ class Attention(nn.Module):
         super(Attention, self).__init__()
         self.attention_type = args.attention_type
         self.device = device
-        self.L = 4096
+        self.L = 512
         self.D = 256
         self.mlp1 = nn.Sequential(
             nn.Linear(4096, 4096),
@@ -57,10 +57,11 @@ class Attention(nn.Module):
     def forward(self, input):
         feature = torch.nan_to_num(input)
         #feature = self.mlp1(feature)
-        #feature, hidden = self.rnn(feature)
+        feature, hidden = self.rnn(feature)
         #feature = self.tsn(feature.transpose(1, 2)).transpose(1, 2)
         #feature = self.mlp1(feature)
         #Attention path
+        '''
         if self.attention_type == 'normal':
             A = self.attention(feature)
         elif self.attention_type == 'gate':
@@ -72,11 +73,18 @@ class Attention(nn.Module):
         #bag = torch.bmm(A, feature)
         #output1 = torch.sigmoid(self.c_bag(torch.cat((bag, hidden[-1]), dim=1))).view(-1)
         output1 = torch.sigmoid(self.c_bag(bag)).view(-1)
+        '''
         #Cluster path
-        output_seg = self.c_segment(feature).squeeze(2)
-        attention_boost = 2 * torch.sigmoid(A).squeeze(1)
-        output_seg = torch.sigmoid(output_seg * attention_boost)
-        #output_seg = torch.sigmoid(output_seg)
+        #A = 2 * torch.sigmoid(A)
+        #A = A.view(1, -1, 1).expand(-1, -1, feature.shape[-1])
+        #feature = feature * A
+        A = self.c_segment(feature).squeeze(2)
+        #attention_boost = 2 * torch.sigmoid(A).squeeze(1)
+        #output_seg = torch.sigmoid(output_seg * attention_boost)
+        output_seg = torch.sigmoid(A)
+        A = torch.transpose(A.unsqueeze(2), 1, 2)
+        bag = torch.bmm(F.softmax(A, dim=2), feature).squeeze(1)
+        output1 = torch.sigmoid(self.c_bag(bag)).view(-1)
         cluster1 = []
         cluster2 = []
         output2 = torch.tensor([]).to(self.device)
@@ -90,14 +98,14 @@ class Attention(nn.Module):
             c2 = torch.nonzero(cluster!=0).view(-1).to(self.device)
             c1 = torch.index_select(output_seg[i], 0, c1)
             c2 = torch.index_select(output_seg[i], 0, c2)
-            #out = max(c1.max(), c2.max()).view(-1)
-            out = output_seg[i].max().view(-1)
+            out = max(c1.max(), c2.max()).view(-1)
+            #out = output_seg[i].max().view(-1)
             cluster1.append(c1)
             cluster2.append(c2)
             output2 = torch.cat((output2, out), dim=0)
-        weight = 0.5
-        output1 = output1 * weight
-        output2 = output2 * (1 - weight)
+        #weight = 0.5
+        #output1 = output1 * weight
+        #output2 = output2 * (1 - weight)
         output = torch.cat((output1.view(-1, 1), output2.view(-1, 1)), 1)
         #output = output2
         return feature, (cluster1, cluster2), output_seg, output, A

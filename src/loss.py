@@ -46,8 +46,8 @@ class InnerBagLoss(nn.Module):
                 #loss += abs(maxscore - minscore)
                 #return abs(c1.mean() - c2.mean())
             else:
-                c_a = c1[i] if c1[i].mean() >= c2[i].mean() else c2[i]
-                c_n = c2[i] if c2[i].mean() < c1[i].mean() else c1[i]
+                c_a = c1[i] if c1[i].max() >= c2[i].max() else c2[i]
+                c_n = c2[i] if c2[i].max() < c1[i].max() else c1[i]
                 maxscore = max(c1[i].max(), c2[i].max())
                 minscore = min(c1[i].min(), c2[i].min())
                 #anomaly
@@ -99,5 +99,9 @@ class SmallLoss(nn.Module):
         for A in output_seg:
             loss += A.sum()
         return loss
-
-
+class OutputLoss(nn.Module):
+    def forward(self, outputs):
+        loss = 0
+        for output in outputs:
+            loss += torch.abs(output[0] - output[1])
+        return loss
