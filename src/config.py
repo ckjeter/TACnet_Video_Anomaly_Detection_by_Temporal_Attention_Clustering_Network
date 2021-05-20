@@ -10,7 +10,7 @@ else:
     token = 'C' + str(segment_length)
 train_path = os.path.join(root, 'features', token, 'train')
 test_path = os.path.join(root, 'features', token, 'test')
-loss_parameter = [1, 0.01, 0.3, 0.3, 0.01, 0.01, 0]
+loss_parameter = [1, 0.01, 0.3, 0.3, 0.001, 0.001]
 def parse_args():
     parser = argparse.ArgumentParser(description="fuck")
     parser.add_argument('--gpus', type=str, default='0', help="multi GPUs?")
@@ -18,7 +18,7 @@ def parse_args():
     parser.add_argument('--train_path', type=str, default=train_path)
     parser.add_argument('--test_path', type=str, default=test_path)
     parser.add_argument('--attention_type', type=str, default='normal')
-    parser.add_argument('--epoch', type=int, default=50)
+    parser.add_argument('--epoch', type=int, default=300)
     parser.add_argument('--lr', type=float, default=1e-5)
     parser.add_argument('--batch_size', type=int, default=1)
     parser.add_argument('--root', type=str, default='')
@@ -28,5 +28,6 @@ def parse_args():
     parser.add_argument('--c_graph', action="store_true", help="cluster_graph")
     parser.add_argument('--tsne', action='store_true')
     parser.add_argument('--savelog', action="store_true")
-    parser.add_argument('--load_C3D', action="store_true")
+    parser.add_argument('--load_backbone', action="store_true")
+    parser.add_argument('--note', type=str, default='')
     return parser.parse_args()
