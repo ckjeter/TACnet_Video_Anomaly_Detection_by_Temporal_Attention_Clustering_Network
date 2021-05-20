@@ -59,7 +59,7 @@ def test(model, loader, device, args, logger):
             baglabel = 1
         feature = backbone(imgs.squeeze(0)).unsqueeze(0)
         feature, clusters, output_seg, bagoutput, A = net(feature)
-        bagoutput = torch.mean(bagoutput, 1)
+        bagoutput = torch.sum(bagoutput, 1)
         result.addbag(bagoutput.view(-1).tolist(), [baglabel])
         
         #test my idea

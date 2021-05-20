@@ -62,7 +62,7 @@ def train(model, trainloader, device, optimizer):
         batch_size = imgs.shape[0]
         feature = backbone(imgs.view(-1, 3, 16, 112, 112)).view(batch_size, 32, -1)
         feature, clusters, output_seg, output_bag, A = net(feature)
-        output = torch.mean(output_bag, 1)
+        output = torch.sum(output_bag, 1)
         #output_seg = net.maxminnorm(A)
         bag_loss = bagLoss(output.view(-1), label.view(-1).type(torch.float))
         cluster_loss = clusterLoss(feature, label)
