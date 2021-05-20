@@ -37,7 +37,7 @@ if __name__ == "__main__":
     else:
         backbone = backbone.to(device)
         net = net.to(device)
-    if not args.load_C3D:
+    if not args.load_backbone:
         backbone.load_state_dict(torch.load("models/c3d.pickle"))
     else:
         backbone.load_state_dict(torch.load(args.model_path.replace(".pth", "C3D.pth")))

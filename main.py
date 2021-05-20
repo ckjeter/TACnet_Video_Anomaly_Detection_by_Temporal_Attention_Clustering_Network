@@ -26,7 +26,9 @@ import src.config as config
 def main():
     args = config.parse_args()
     logger = util.logger(args)
-
+    if len(args.note) > 0:
+        logger.info("Note:")
+        logger.info(args.note)
     multi_gpus = False
     if len(args.gpus.split(',')) > 1:
         multi_gpus = True
