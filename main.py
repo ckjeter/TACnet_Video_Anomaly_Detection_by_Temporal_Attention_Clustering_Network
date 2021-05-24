@@ -74,8 +74,8 @@ def main():
     logger.recordparameter()
     model = [backbone, net]
     maxauc = 0
-    for epoch in range(epoch_start, epoch_start + args.epoch):
-        logger.info("Epoch: {}/{}".format(epoch, epoch_start + args.epoch))
+    for epoch in range(epoch_start, args.epoch):
+        logger.info("Epoch: {}/{}".format(epoch, args.epoch))
         
         model, losses = train(model, trainloader, device, optimizer)
         with torch.no_grad():
