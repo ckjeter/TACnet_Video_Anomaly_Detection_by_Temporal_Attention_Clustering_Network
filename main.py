@@ -17,7 +17,7 @@ import ipdb
 
 from src.dataset import FrameFolderDataset, SegmentDataset, UCFCrime
 from src.pytorch_i3d import InceptionI3d
-from src.backbone import C3D, Attention
+from src.backbone import C3D, Temp_Attn, Vis_Attn
 from src.test import test
 from src.train import train
 import src.util as util
@@ -46,8 +46,9 @@ def main():
     testloader = DataLoader(testset, batch_size=1, shuffle=False)
     
     #----------Prepare Models----------
+    atten = Vis_Attn(in_dim=9)
     backbone = C3D()
-    net = Attention(args, device)
+    net = Temp_Attn(args, device)
     if len(args.model_path) > 0:
         backbone.load_state_dict(torch.load(args.model_path.replace(".pth", "C3D.pth")))
         net.load_state_dict(torch.load(args.model_path))
@@ -55,11 +56,12 @@ def main():
     else:
         backbone.load_state_dict(torch.load("models/c3d.pickle"))
         epoch_start = 0
-    
     if multi_gpus:
+        atten = nn.DataParallel(atten).to(device)
         backbone = nn.DataParallel(backbone).to(device)
         net = nn.DataParallel(net).to(device)
     else:
+        atten = atten.to(device)
         backbone = backbone.to(device)
         net = net.to(device)
     
@@ -69,10 +71,10 @@ def main():
         {'params': net.parameters(), 'lr': args.lr}
     ])
     #optimizer = optim.SGD(net.parameters(), momentum=0.5, lr=args.lr)
-    scheduler = MultiStepLR(optimizer, [15, 20, 30], gamma=0.1)
+    scheduler = MultiStepLR(optimizer, [50, 100, 150], gamma=0.1)
     
     logger.recordparameter()
-    model = [backbone, net]
+    model = [backbone, net, atten]
     maxauc = 0
     for epoch in range(epoch_start, args.epoch):
         logger.info("Epoch: {}/{}".format(epoch, args.epoch))

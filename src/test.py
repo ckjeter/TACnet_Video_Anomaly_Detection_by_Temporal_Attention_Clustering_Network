@@ -25,7 +25,7 @@ from tensorboardX import SummaryWriter
 
 from src.dataset import FrameFolderDataset, SegmentDataset
 from src.pytorch_i3d import InceptionI3d
-from src.backbone import C3D, Attention
+from src.backbone import C3D, Vis_Attn, Temp_Attn
 from src.loss import ClusterLoss, SmoothLoss
 from src.util import Averager, Scorer, AnomalyResult
 import src.util as util
@@ -39,9 +39,10 @@ def bagexpand(bag, length):
     return instances
 
 def test(model, loader, device, args, logger):
-    backbone, net = model
+    backbone, net, atten = model
     net.eval()
     backbone.eval()
+    atten.eval()
     torch.manual_seed(777)
     maxauc = 0
     result = AnomalyResult()

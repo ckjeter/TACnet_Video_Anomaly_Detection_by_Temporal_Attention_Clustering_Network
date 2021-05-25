@@ -4,13 +4,45 @@ from torchvision import models
 import torch.nn.functional as F
 from kmeans_pytorch import kmeans
 import ipdb
+class Vis_Attn(nn.Module):
+    """ Self attention Layer """""
+    def __init__(self,in_dim):
+        super(Vis_Attn,self).__init__()
+        self.chanel_in = in_dim
 
-class Attention(nn.Module):
+        self.query_conv = nn.Conv2d(in_channels = in_dim , out_channels = in_dim//3 , kernel_size= 1)
+        self.key_conv = nn.Conv2d(in_channels = in_dim , out_channels = in_dim//3 , kernel_size= 1)
+        #self.value_conv = nn.Conv2d(in_channels = in_dim , out_channels = in_dim//3 , kernel_size= 1)
+        self.gamma = nn.Parameter(torch.zeros(1))
+
+        self.softmax  = nn.Softmax(dim=-1) #
+    def forward(self,x):
+        """
+        inputs :
+        x : input feature maps( B X C X W X H )
+        returns :
+        out : self attention value + input feature 
+        attention: B X N X N (N is Width*Height)
+        """
+        m_batchsize,C,width ,height = x.size()
+        proj_query  = self.query_conv(x).view(m_batchsize,-1,width*height).permute(0,2,1) # B X CX(N)
+        proj_key =  self.key_conv(x).view(m_batchsize,-1,width*height) # B X C x (*W*H)
+        energy =  torch.bmm(proj_query,proj_key) # transpose check
+        attention = self.softmax(energy) # BX (N) X (N) 
+        #proj_value = self.value_conv(x).view(m_batchsize,-1,width*height) # B X C X N
+        proj_value = x[:, 3:6, :, :].view(m_batchsize, -1, width*height)
+
+        out = torch.bmm(proj_value,attention.permute(0,2,1) )
+        out = out.view(m_batchsize,3,width,height)
+        out = self.gamma*out + x[:, 3:6, :, :]
+        return out,attention
+
+class Temp_Attn(nn.Module):
     def __init__(self, args, device):
-        super(Attention, self).__init__()
+        super(Temp_Attn, self).__init__()
         self.attention_type = args.attention_type
         self.device = device
-        self.L = 4096
+        self.L = 256
         self.D = 256
         self.mlp1 = nn.Sequential(
             nn.Linear(4096, 4096),
@@ -34,8 +66,7 @@ class Attention(nn.Module):
         )
         self.attention_gate = nn.Linear(self.D, 1)
         self.c_bag = self.classifier(self.L)
-        self.c_segment = self.classifier(self.L)
-
+        self.c_segment = self.classifier(self.L + 1)
     def classifier(self, input_dim):
         return nn.Sequential(
             nn.Linear(input_dim, self.D),
@@ -55,32 +86,42 @@ class Attention(nn.Module):
         return (A - min(A)) / (max(A)-min(A))
 
     def forward(self, input):
-        feature = torch.nan_to_num(input)
+        feature = torch.nan_to_num(input) #1, 32, self.L
+        batch_size = input.shape[0]
+        #key point
         #feature = self.mlp1(feature)
         #feature, hidden = self.rnn(feature)
-        #feature = self.tsn(feature.transpose(1, 2)).transpose(1, 2)
-        #feature = self.mlp1(feature)
+        feature = self.tsn(feature.transpose(1, 2)).transpose(1, 2)
+
         #Attention path
         if self.attention_type == 'normal':
-            A = self.attention(feature)
+            A = self.attention(feature) 
         elif self.attention_type == 'gate':
             A_V = self.attention_V(feature)
             A_U = self.attention_U(feature)
             A = self.attention_gate(A_V * A_U)
-        A = torch.transpose(A, 1, 2)
-        bag = torch.bmm(F.softmax(A, dim=2), feature).squeeze(1)
+        #A: 1, 32, 1
+        A = torch.transpose(A, 1, 2) #1, 1, 32
+        bag = torch.bmm(F.softmax(A, dim=2), feature).squeeze(1) #1, self.L
         #bag = torch.bmm(A, feature)
         #output1 = torch.sigmoid(self.c_bag(torch.cat((bag, hidden[-1]), dim=1))).view(-1)
-        output1 = torch.sigmoid(self.c_bag(bag)).view(-1)
+        output1 = torch.sigmoid(self.c_bag(bag)).view(-1) #1, 1
 
         #Cluster path
         #A = 2 * torch.sigmoid(A)
         #A = A.view(1, -1, 1).expand(-1, -1, feature.shape[-1])
         #feature = feature * A
         #A = self.c_segment(feature).squeeze(2)
-        output_seg = self.c_segment(feature).squeeze(2)
-        attention_boost = 2 * torch.sigmoid(A).squeeze(1)
-        output_seg = torch.sigmoid(output_seg * attention_boost)
+
+        #key point
+        #concate? multiply?
+        output_seg = self.c_segment(torch.cat((feature, A.view(batch_size, 32, 1)), dim=2)).squeeze(2)
+        output_seg = torch.sigmoid(output_seg)
+        #1, 32
+        #attention_boost = 2 * torch.sigmoid(A).squeeze(1)
+        #output_seg = torch.sigmoid(output_seg * attention_boost)
+        #dont del
+
         #output_seg = torch.sigmoid(A)
         #A = torch.transpose(A.unsqueeze(2), 1, 2)
         #bag = torch.bmm(F.softmax(A, dim=2), feature).squeeze(1)
@@ -92,14 +133,17 @@ class Attention(nn.Module):
             #f = feature_dirty[i][~torch.any(feature_dirty[i].isnan(),dim=1)]
             f = feature[i]
             cluster, centers = kmeans(
-                X=f, num_clusters=2, distance='euclidean', device=self.device, iter_limit=100)
+                X=f, num_clusters=2, distance='cosine', device=self.device, iter_limit=100)
             #output_seg = torch.sigmoid(output_seg.view(-1))
             c1 = torch.nonzero(cluster==0).view(-1).to(self.device)
             c2 = torch.nonzero(cluster!=0).view(-1).to(self.device)
             c1 = torch.index_select(output_seg[i], 0, c1)
             c2 = torch.index_select(output_seg[i], 0, c2)
-            #out = max(c1.max(), c2.max()).view(-1)
+
+            #key point
+            #out = max(c1.mean(), c2.mean()).view(-1)
             out = output_seg[i].max().view(-1)
+
             cluster1.append(c1)
             cluster2.append(c2)
             output2 = torch.cat((output2, out), dim=0)

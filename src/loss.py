@@ -18,7 +18,7 @@ class ClusterLoss(nn.Module):
             f = feature[i]
             if label[i] == 1:
                 _, centers = kmeans(
-                    X=f, num_clusters=2, distance='euclidean', device=self.device, iter_limit=100)
+                    X=f, num_clusters=2, distance='cosine', device=self.device, iter_limit=100)
                 centers = centers.to(self.device)
                 dst = torch.cdist(centers[0].view(1, 1, -1), centers[1].view(1, 1, -1))
                 loss += 1 / dst.view(-1)

@@ -23,15 +23,16 @@ from tensorboardX import SummaryWriter
 
 from src.dataset import FrameFolderDataset, SegmentDataset
 from src.pytorch_i3d import InceptionI3d
-from src.backbone import C3D, Attention
+from src.backbone import C3D, Vis_Attn, Temp_Attn
 from src.loss import ClusterLoss, SmoothLoss, MaxminLoss, InnerBagLoss, SmallLoss, OutputLoss
 from src.util import Averager
 import src.config as config
         
 def train(model, trainloader, device, optimizer):
-    backbone, net = model
+    backbone, net, atten = model
     backbone.train()
     net.train()
+    atten.train()
     bagLoss = nn.BCELoss().to(device)
     clusterLoss = ClusterLoss(device).to(device)
     smoothLoss = SmoothLoss().to(device)
@@ -58,8 +59,20 @@ def train(model, trainloader, device, optimizer):
         imgs = imgs.to(device)
         #feature = torch.nan_to_num(feature)
         label = label.to(device)
-
         batch_size = imgs.shape[0]
+        '''
+        imgs_atten = torch.zeros(imgs.shape).to(device)
+        for seqs in imgs:
+            for i, clip in enumerate(seqs):
+                for j in range(16):
+                    prev = max(0, j - 1)
+                    post = min(j + 1, 15)
+                    prev = clip.transpose(0, 1)[prev]
+                    cur = clip.transpose(0, 1)[j]
+                    post = clip.transpose(0, 1)[post]
+                    out, attn = atten(torch.cat((prev, cur, post), dim=0).unsqueeze(0))
+                    imgs_atten[0, i, :, j, :, :] = out
+        '''
         feature = backbone(imgs.view(-1, 3, 16, 112, 112)).view(batch_size, 32, -1)
         feature, clusters, output_seg, output_bag, A = net(feature)
         output = torch.sum(output_bag, 1)
