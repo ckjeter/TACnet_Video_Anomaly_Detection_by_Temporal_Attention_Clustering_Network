@@ -57,22 +57,12 @@ def train(model, trainloader, device, optimizer):
         sys.stdout.flush()
         title, imgs, label, length = data
         imgs = imgs.to(device)
+        batch, length, c, clip_length, w, h = imgs.shape
         #feature = torch.nan_to_num(feature)
         label = label.to(device)
-        batch_size = imgs.shape[0]
-        '''
-        imgs_atten = torch.zeros(imgs.shape).to(device)
-        for seqs in imgs:
-            for i, clip in enumerate(seqs):
-                for j in range(16):
-                    prev = max(0, j - 1)
-                    post = min(j + 1, 15)
-                    prev = clip.transpose(0, 1)[prev]
-                    cur = clip.transpose(0, 1)[j]
-                    post = clip.transpose(0, 1)[post]
-                    out, attn = atten(torch.cat((prev, cur, post), dim=0).unsqueeze(0))
-                    imgs_atten[0, i, :, j, :, :] = out
-        '''
+        imgs_seq = imgs.transpose(2, 3).reshape(batch, length, -1, w, h)
+        attns = atten(imgs_seq.squeeze(0))
+        ipdb.set_trace()
         feature = backbone(imgs.view(-1, 3, 16, 112, 112)).view(batch_size, 32, -1)
         feature, clusters, output_seg, output_bag, A = net(feature)
         output = torch.sum(output_bag, 1)

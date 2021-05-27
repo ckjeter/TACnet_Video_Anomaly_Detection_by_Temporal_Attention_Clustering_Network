@@ -29,13 +29,16 @@ class Vis_Attn(nn.Module):
         proj_key =  self.key_conv(x).view(m_batchsize,-1,width*height) # B X C x (*W*H)
         energy =  torch.bmm(proj_query,proj_key) # transpose check
         attention = self.softmax(energy) # BX (N) X (N) 
+        '''
         #proj_value = self.value_conv(x).view(m_batchsize,-1,width*height) # B X C X N
         proj_value = x[:, 3:6, :, :].view(m_batchsize, -1, width*height)
 
         out = torch.bmm(proj_value,attention.permute(0,2,1) )
         out = out.view(m_batchsize,3,width,height)
         out = self.gamma*out + x[:, 3:6, :, :]
-        return out,attention
+        '''
+        #return out,attention
+        return attention
 
 class Temp_Attn(nn.Module):
     def __init__(self, args, device):
@@ -141,8 +144,8 @@ class Temp_Attn(nn.Module):
             c2 = torch.index_select(output_seg[i], 0, c2)
 
             #key point
-            #out = max(c1.mean(), c2.mean()).view(-1)
-            out = output_seg[i].max().view(-1)
+            out = max(c1.mean(), c2.mean()).view(-1)
+            #out = output_seg[i].max().view(-1)
 
             cluster1.append(c1)
             cluster2.append(c2)

@@ -46,7 +46,7 @@ def main():
     testloader = DataLoader(testset, batch_size=1, shuffle=False)
     
     #----------Prepare Models----------
-    atten = Vis_Attn(in_dim=9)
+    atten = Vis_Attn(in_dim=48)
     backbone = C3D()
     net = Temp_Attn(args, device)
     if len(args.model_path) > 0:
