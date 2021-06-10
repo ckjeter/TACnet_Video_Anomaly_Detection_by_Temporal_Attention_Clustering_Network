@@ -31,4 +31,5 @@ def parse_args():
     parser.add_argument('--load_backbone', action="store_true")
     parser.add_argument('--note', type=str, default='')
     parser.add_argument('--drawmask', action="store_true")
+    parser.add_argument('--drawattn', action="store_true")
     return parser.parse_args()

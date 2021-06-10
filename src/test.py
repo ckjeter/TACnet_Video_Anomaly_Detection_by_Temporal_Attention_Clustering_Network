@@ -53,6 +53,7 @@ def test(model, loader, device, args, logger):
         batch, seq_length, channel, clip_length, h, w = imgs.shape
         label = label[0]
         length = length[0]
+
         imgs_seq = torch.tensor([]).to(device)
         for seqs in imgs:
             for num, clip in enumerate(seqs): 
@@ -65,6 +66,14 @@ def test(model, loader, device, args, logger):
                     seq = torch.cat((prev, cur, post), dim=0)
                     imgs_seq = torch.cat((imgs_seq, seq.unsqueeze(0)), dim=0)
         imgs_attn, attn = atten(imgs_seq)
+
+        #imgs = imgs.transpose(2, 3).reshape(-1, channel, h, w)
+        #imgs_diff = torch.abs(imgs[1:] - imgs[:-1])
+        #zero = torch.zeros(imgs[0].shape).unsqueeze(0).to(device)
+        #imgs_diff = torch.cat((zero, imgs_diff, zero), dim=0)
+        #imgs_flow = imgs_diff[1:] + imgs_diff[:-1]
+        #imgs_attn, attn = atten(imgs_flow)
+
         imgs = imgs_attn.view(batch, seq_length, clip_length, channel, h, w).transpose(2, 3)
 
         if label[0] < 0:
@@ -84,7 +93,10 @@ def test(model, loader, device, args, logger):
             framepredict = [0] * (sum(length).item())
         else:
             framepredict = bagexpand(output_seg[0].cpu().tolist(), length)
-        result.add(title[0], feature, framepredict, label, length)
+        A = A.view(-1)
+        A = (A - A.min()) / (A.max() - A.min())
+        A = bagexpand(A.cpu().tolist(), length)
+        result.add(title[0], feature, framepredict, label, length, A)
         if args.p_graph:
             figure = result.predictplot(title[0])
             logger.savefig(figure, os.path.join('performance', title[0] + '.png'))
@@ -93,10 +105,15 @@ def test(model, loader, device, args, logger):
             logger.savefig(figure, os.path.join('cluster', title[0] + '.png'))
         if args.drawmask:
             for count in range(0, 512):
+                seg_count = count // 16
+                seg_pos = count % 16
+                step = length[seg_count] // 16
+                realcount = length[:seg_count].sum() + (step * seg_pos)
+                realcount = realcount.item()
                 mask = attn[count].view(h, w, 1).cpu().numpy()
                 #mask = (mask - mask.min()) / (mask.max() - mask.min())
                 #mask = ((1 - mask) * 256).astype(np.uint8)
                 mask = (mask * 256).astype(np.uint8)
                 mask = cv2.applyColorMap(mask, cv2.COLORMAP_HOT)
-                logger.savefig(mask, os.path.join('mask', title[0], str(count)+'.png'))
+                logger.savefig(mask, os.path.join('mask', title[0], str(realcount)+'.png'))
     return result 
