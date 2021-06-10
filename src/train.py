@@ -24,7 +24,7 @@ from tensorboardX import SummaryWriter
 from src.dataset import FrameFolderDataset, SegmentDataset
 from src.pytorch_i3d import InceptionI3d
 from src.backbone import C3D, Vis_Attn, Temp_Attn
-from src.loss import ClusterLoss, SmoothLoss, MaxminLoss, InnerBagLoss, SmallLoss, OutputLoss
+from src.loss import *
 from src.util import Averager
 import src.config as config
         
@@ -39,7 +39,7 @@ def train(model, trainloader, device, optimizer):
     innerbagLoss = InnerBagLoss(device).to(device)
     maxminLoss = MaxminLoss().to(device)
     smallLoss = SmallLoss().to(device)
-    outputLoss = OutputLoss().to(device)
+    maskLoss = MaskLoss().to(device)
 
     bag_loss_count = Averager()
     cluster_minloss_count = Averager()
@@ -50,20 +50,30 @@ def train(model, trainloader, device, optimizer):
     maxminloss_count = Averager()
     innerloss_count = Averager()
     smooth_loss_count = Averager()
-    output_loss_count = Averager()
+    mask_loss_count = Averager()
 
     for i, data in enumerate(trainloader):
         sys.stdout.write("    Train Batch: {}/{}\r".format(i, len(trainloader)))
         sys.stdout.flush()
         title, imgs, label, length = data
         imgs = imgs.to(device)
-        batch, length, c, clip_length, w, h = imgs.shape
+        batch, seq_length, channel, clip_length, h, w = imgs.shape
         #feature = torch.nan_to_num(feature)
         label = label.to(device)
-        imgs_seq = imgs.transpose(2, 3).reshape(batch, length, -1, w, h)
-        attns = atten(imgs_seq.squeeze(0))
-        ipdb.set_trace()
-        feature = backbone(imgs.view(-1, 3, 16, 112, 112)).view(batch_size, 32, -1)
+        imgs_seq = torch.tensor([]).to(device)
+        for seqs in imgs:
+            for i, clip in enumerate(seqs): 
+                for j in range(16):
+                    prev = max(0, j - 1)
+                    post = min(j + 1, 15)
+                    prev = clip.transpose(0, 1)[prev]
+                    cur = clip.transpose(0, 1)[j]
+                    post = clip.transpose(0, 1)[post]
+                    seq = torch.cat((prev, cur, post), dim=0)
+                    imgs_seq = torch.cat((imgs_seq, seq.unsqueeze(0)), dim=0)
+        imgs_attn, attn = atten(imgs_seq)
+        imgs = imgs_attn.view(batch, seq_length, clip_length, channel, h, w).transpose(2, 3)
+        feature = backbone(imgs.view(-1, 3, 16, 112, 112)).view(batch, 32, -1)
         feature, clusters, output_seg, output_bag, A = net(feature)
         output = torch.sum(output_bag, 1)
         #output_seg = net.maxminnorm(A)
@@ -73,14 +83,14 @@ def train(model, trainloader, device, optimizer):
         smooth_loss = smoothLoss(output_seg)
         small_loss = smallLoss(output_seg)
         maxmin_loss = maxminLoss(output_seg, label)
-        output_loss = outputLoss(output_bag)
+        mask_loss = maskLoss(attn)
 
         bag_loss_count.add(bag_loss.item())
         smooth_loss_count.add(smooth_loss.item())
         cluster_loss_count.add(cluster_loss.item())
         innerloss_count.add(innerbag_loss.item())
         maxminloss_count.add(maxmin_loss.item())
-        output_loss_count.add(output_loss.item())
+        mask_loss_count.add(mask_loss.item())
         '''
         if label.item() == 0:
             cluster_minloss_count.add(cluster_loss.item())
@@ -90,7 +100,7 @@ def train(model, trainloader, device, optimizer):
             innerloss_anomaly_count.add(innerbag_loss.item())
         '''
         parameter = config.loss_parameter
-        losses = [bag_loss, cluster_loss, innerbag_loss, maxmin_loss, smooth_loss, small_loss, output_loss]
+        losses = [bag_loss, cluster_loss, innerbag_loss, maxmin_loss, smooth_loss, small_loss, mask_loss]
         loss = sum([p * l for p, l in zip(parameter, losses)])
         optimizer.zero_grad()
         loss.backward()
@@ -101,8 +111,8 @@ def train(model, trainloader, device, optimizer):
                 innerloss_anomaly_count.item(), innerloss_normal_count.item()]
     '''
     losses = [bag_loss_count.item(), cluster_loss_count.item(), smooth_loss_count.item(),
-                maxminloss_count.item(), innerloss_count.item(), small_loss.item(), output_loss.item()]
-    return [backbone, net], losses
+                maxminloss_count.item(), innerloss_count.item(), small_loss.item(), mask_loss.item()]
+    return [backbone, net, atten], losses
 
 if __name__ == '__main__':
     pass

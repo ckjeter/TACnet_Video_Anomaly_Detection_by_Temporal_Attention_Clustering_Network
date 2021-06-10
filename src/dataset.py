@@ -66,7 +66,6 @@ class UCFCrime(Dataset):
                 clip = c
             imgs = np.array([np.array(Image.open(path).resize((171, 128), Image.BICUBIC), dtype=np.float) for path in clip])
             imgs = imgs.transpose(3, 0, 1, 2) # (T, H, W, C) => (C, T, H, W)
-            #imgs = imgs[:, :, 8:120, 30:142]
             imgs = (imgs - self.mean[0][:, :imgs.shape[1], :, :])[:, :, 8:120, 30:142]
             if imgs.shape[1] < config.segment_length:
                 imgs = np.pad(imgs, ((0, 0), (0, config.segment_length - imgs.shape[1]), (0, 0), (0, 0)), 'constant')

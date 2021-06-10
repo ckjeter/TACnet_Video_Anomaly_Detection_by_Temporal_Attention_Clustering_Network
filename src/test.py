@@ -10,6 +10,7 @@ from torch.optim.lr_scheduler import MultiStepLR
 import torch.nn.functional as F
 
 import csv
+import cv2
 import random
 import numpy as np
 import pandas as pd
@@ -23,12 +24,10 @@ from matplotlib.patches import Rectangle
 
 from tensorboardX import SummaryWriter 
 
-from src.dataset import FrameFolderDataset, SegmentDataset
+from src.dataset import *
 from src.pytorch_i3d import InceptionI3d
-from src.backbone import C3D, Vis_Attn, Temp_Attn
-from src.loss import ClusterLoss, SmoothLoss
-from src.util import Averager, Scorer, AnomalyResult
-import src.util as util
+from src.backbone import *
+from src.util import *
 import src.config as config
 
 
@@ -51,8 +50,22 @@ def test(model, loader, device, args, logger):
         sys.stdout.flush()
         title, imgs, label, length = data
         imgs = imgs.to(device)
+        batch, seq_length, channel, clip_length, h, w = imgs.shape
         label = label[0]
         length = length[0]
+        imgs_seq = torch.tensor([]).to(device)
+        for seqs in imgs:
+            for num, clip in enumerate(seqs): 
+                for j in range(16):
+                    prev = max(0, j - 1)
+                    post = min(j + 1, 15)
+                    prev = clip.transpose(0, 1)[prev]
+                    cur = clip.transpose(0, 1)[j]
+                    post = clip.transpose(0, 1)[post]
+                    seq = torch.cat((prev, cur, post), dim=0)
+                    imgs_seq = torch.cat((imgs_seq, seq.unsqueeze(0)), dim=0)
+        imgs_attn, attn = atten(imgs_seq)
+        imgs = imgs_attn.view(batch, seq_length, clip_length, channel, h, w).transpose(2, 3)
 
         if label[0] < 0:
             baglabel = 0
@@ -78,4 +91,12 @@ def test(model, loader, device, args, logger):
         if args.c_graph:
             figure = result.clusterplot(title[0])
             logger.savefig(figure, os.path.join('cluster', title[0] + '.png'))
+        if args.drawmask:
+            for count in range(0, 512):
+                mask = attn[count].view(h, w, 1).cpu().numpy()
+                #mask = (mask - mask.min()) / (mask.max() - mask.min())
+                #mask = ((1 - mask) * 256).astype(np.uint8)
+                mask = (mask * 256).astype(np.uint8)
+                mask = cv2.applyColorMap(mask, cv2.COLORMAP_HOT)
+                logger.savefig(mask, os.path.join('mask', title[0], str(count)+'.png'))
     return result 

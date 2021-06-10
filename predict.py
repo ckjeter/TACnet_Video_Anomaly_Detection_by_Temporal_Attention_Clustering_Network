@@ -12,16 +12,15 @@ import numpy as np
 import logging
 import ipdb
 
-from src.dataset import FrameFolderDataset, SegmentDataset, UCFCrime
+from src.dataset import *
 from src.test import test
-from src.backbone import C3D, Attention
-from src.util import Averager, Scorer, AnomalyResult
-import src.util as util
+from src.backbone import *
+from src.util import *
 import src.config as config
 
 if __name__ == "__main__":
     args = config.parse_args()
-    logger = util.logger(args)
+    logger = logger(args)
     multi_gpus = False
     if len(args.gpus.split(',')) > 1:
         multi_gpus = True
@@ -30,25 +29,29 @@ if __name__ == "__main__":
     logging.info(device)
 
     backbone = C3D()
-    net = Attention(args, device)
+    net = Temp_Attn(args, device)
+    atten = Vis_Attn()
     if multi_gpus:
         backbone = nn.DataParallel(backbone).to(device)
         net = nn.DataParallel(net).to(device)
+        atten = nn.DataParallel(atten).to(device)
     else:
         backbone = backbone.to(device)
         net = net.to(device)
+        atten = atten.to(device)
     if not args.load_backbone:
         backbone.load_state_dict(torch.load("models/c3d.pickle"))
     else:
         backbone.load_state_dict(torch.load(args.model_path.replace(".pth", "C3D.pth")))
     net.load_state_dict(torch.load(args.model_path))
+    atten.load_state_dict(torch.load(args.model_path.replace(".pth", "attn.pth")))
     logger.name = os.path.basename(os.path.dirname(args.model_path))
     #testset = SegmentDataset(args.test_path, test=True)
     testset = UCFCrime(test=True, target=args.target)
     testloader = DataLoader(testset, batch_size=1, shuffle=False)
 
     with torch.no_grad():
-        result = test([backbone, net], testloader, device, args, logger)
+        result = test([backbone, net, atten], testloader, device, args, logger)
     try:
         roc, roc_bag = result.roccurve()
         logger.savefig(roc, "ROC.png")

@@ -10,7 +10,7 @@ else:
     token = 'C' + str(segment_length)
 train_path = os.path.join(root, 'features', token, 'train')
 test_path = os.path.join(root, 'features', token, 'test')
-loss_parameter = [1, 0.01, 0.3, 0.3, 0.001, 0.001]
+loss_parameter = [1, 0.01, 0.3, 0.3, 0.001, 0.001, 0]
 def parse_args():
     parser = argparse.ArgumentParser(description="fuck")
     parser.add_argument('--gpus', type=str, default='0', help="multi GPUs?")
@@ -30,4 +30,5 @@ def parse_args():
     parser.add_argument('--savelog', action="store_true")
     parser.add_argument('--load_backbone', action="store_true")
     parser.add_argument('--note', type=str, default='')
+    parser.add_argument('--drawmask', action="store_true")
     return parser.parse_args()

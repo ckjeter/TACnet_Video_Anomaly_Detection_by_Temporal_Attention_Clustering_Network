@@ -1,4 +1,5 @@
 import torch
+import cv2
 import csv
 import numpy as np
 from datetime import datetime
@@ -94,9 +95,11 @@ class AnomalyVideo(Scorer):
             if self.rawlabel[i] != -1:
                 ax.add_patch(Rectangle((self.rawlabel[i], 0)
                     , self.rawlabel[i+1]-self.rawlabel[i], 1, color='red', alpha=0.5))
-                ticks.append(self.rawlabel[i])
-                ticks.append(self.rawlabel[i+1])
-        ticks.append(len(self.predict)-1)
+                #ticks.append(self.rawlabel[i])
+                #ticks.append(self.rawlabel[i+1])
+        for i in range(0, len(self.predict), len(self.predict)//10):
+            ticks.append(i)
+        #ticks.append(len(self.predict)-1)
         plt.xticks(ticks)
         try:
             props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
@@ -178,7 +181,7 @@ class logger():
             self.writer = SummaryWriter(writerpath)
             self.log.info("create writer: {}".format(writerpath))
     def recordparameter(self):
-        self.log.info("loss = {0[0]}*bag+{0[1]}*cluster+{0[2]}*innerbag+{0[3]}*maxmin+{0[4]}*smooth+{0[5]}*small".format(config.loss_parameter))
+        self.log.info("loss = {0[0]}*bag+{0[1]}*cluster+{0[2]}*innerbag+{0[3]}*maxmin+{0[4]}*smooth+{0[5]}*small+{0[6]}*mask".format(config.loss_parameter))
     def recordloss(self, losses, epoch):
         if self.args.savelog: 
             self.writer.add_scalar('bag_loss', losses[0], epoch)
@@ -192,7 +195,7 @@ class logger():
                 "cluster: {:.4f}, innerbag: {:.4f}, maxmin: {:.4f}".format(losses[1], losses[4], losses[3])
         )
         self.log.info(
-                "output: {:.4f}".format(losses[6])
+                "mask: {:.4f}".format(losses[6])
         )
 
     def recordauc(self, result, epoch):
@@ -208,24 +211,33 @@ class logger():
             else:
                 print(k, v.count)
     def savemodel(self, model, epoch):
-        backbone, net = model
+        backbone, net, attn = model
         savepath_C3D = os.path.join(self.root, str(epoch) + 'C3D.pth')
+        savepath_attn = os.path.join(self.root, str(epoch) + 'attn.pth' )
         savepath_net = os.path.join(self.root, str(epoch) + '.pth')
         self.log.info("    Save model: {}".format(savepath_C3D))
+        self.log.info("    Save model: {}".format(savepath_attn))
         self.log.info("    Save model: {}".format(savepath_net))
         torch.save(backbone.state_dict(), savepath_C3D)
         torch.save(net.state_dict(), savepath_net)
+        torch.save(attn.state_dict(), savepath_attn)
     def info(self, message):
         self.log.info(message)
     def savefig(self, figure, path):
+        '''
         folder = os.path.join('image', self.name)
         if not os.path.exists(folder):
             os.mkdir(folder)
-        path = os.path.join(folder, path)
+        '''
+        path = os.path.join('image', self.name, path)
         if not os.path.exists(os.path.dirname(path)):
-            os.mkdir(os.path.dirname(path))
-        figure.savefig(path)
-        plt.close(figure)
+            #os.mkdir(os.path.dirname(path))
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+        try:
+            figure.savefig(path)
+            plt.close(figure)
+        except:
+            cv2.imwrite(path, figure)
 
 def logfile(args):
     if len(args.root) > 0:

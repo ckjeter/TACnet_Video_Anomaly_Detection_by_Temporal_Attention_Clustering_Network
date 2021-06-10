@@ -15,9 +15,9 @@ from pathlib import Path
 from tqdm import tqdm
 import ipdb
 
-from src.dataset import FrameFolderDataset, SegmentDataset, UCFCrime
+from src.dataset import *
 from src.pytorch_i3d import InceptionI3d
-from src.backbone import C3D, Temp_Attn, Vis_Attn
+from src.backbone import *
 from src.test import test
 from src.train import train
 import src.util as util
@@ -46,13 +46,14 @@ def main():
     testloader = DataLoader(testset, batch_size=1, shuffle=False)
     
     #----------Prepare Models----------
-    atten = Vis_Attn(in_dim=48)
+    atten = Vis_Attn()
     backbone = C3D()
     net = Temp_Attn(args, device)
     if len(args.model_path) > 0:
         backbone.load_state_dict(torch.load(args.model_path.replace(".pth", "C3D.pth")))
         net.load_state_dict(torch.load(args.model_path))
-        epoch_start = int(os.path.basename(args.model_path).split(".")[0])
+        atten.load_state_dict(torch.load(args.model_path.replace(".pth", "attn.pth")))
+        epoch_start = int(os.path.basename(args.model_path).split(".")[0]) + 1
     else:
         backbone.load_state_dict(torch.load("models/c3d.pickle"))
         epoch_start = 0
@@ -68,10 +69,11 @@ def main():
     #----------Prepare Training Shit----------
     optimizer = optim.AdamW([
         {'params': backbone.parameters(), 'lr': args.lr * 0.1},
-        {'params': net.parameters(), 'lr': args.lr}
+        {'params': net.parameters(), 'lr': args.lr},
+        {'params': atten.parameters(), 'lr': args.lr}
     ])
     #optimizer = optim.SGD(net.parameters(), momentum=0.5, lr=args.lr)
-    scheduler = MultiStepLR(optimizer, [50, 100, 150], gamma=0.1)
+    scheduler = MultiStepLR(optimizer, [10, 20, 30], gamma=0.1)
     
     logger.recordparameter()
     model = [backbone, net, atten]

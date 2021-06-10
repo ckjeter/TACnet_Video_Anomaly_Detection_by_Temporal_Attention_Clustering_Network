@@ -3,19 +3,41 @@ import torch.nn as nn
 from torchvision import models
 import torch.nn.functional as F
 from kmeans_pytorch import kmeans
+#from .unet_parts import *
 import ipdb
+
 class Vis_Attn(nn.Module):
     """ Self attention Layer """""
-    def __init__(self,in_dim):
+    def __init__(self,in_dim=9):
         super(Vis_Attn,self).__init__()
-        self.chanel_in = in_dim
+        #self.inc = DoubleConv(in_dim, 16)
+        #self.down1 = Down(16, 32)
+        #self.down2 = Down(32, 64)
+        #self.down3 = Down(64, 128)
+        #factor = 2
+        #self.down4 = Down(128, 256 // factor)
+        #self.up1 = Up(256, 128 // factor)
+        #self.up2 = Up(128, 64 // factor)
+        #self.up3 = Up(64, 32 // factor)
+        #self.up4 = Up(32, 16)
+        #self.outc = OutConv(16, 1)
 
-        self.query_conv = nn.Conv2d(in_channels = in_dim , out_channels = in_dim//3 , kernel_size= 1)
-        self.key_conv = nn.Conv2d(in_channels = in_dim , out_channels = in_dim//3 , kernel_size= 1)
-        #self.value_conv = nn.Conv2d(in_channels = in_dim , out_channels = in_dim//3 , kernel_size= 1)
-        self.gamma = nn.Parameter(torch.zeros(1))
+        self.D = in_dim // 3
+        self.atten_V = nn.Sequential(
+                nn.Conv2d(in_channels = in_dim, out_channels = self.D, kernel_size=5, padding=2),
+                nn.Tanh()
+        )
+        self.atten_U = nn.Sequential(
+                nn.Conv2d(in_channels = in_dim, out_channels = self.D, kernel_size=5, padding=2),
+                nn.Sigmoid()
+        )
+        self.atten_gate = nn.Conv2d(in_channels = self.D, out_channels = 1, kernel_size=5, padding=2)
+        self.attention = nn.Sequential(
+                nn.Conv2d(in_channels = in_dim, out_channels = in_dim//3, kernel_size=1),
+                nn.Tanh(),
+                nn.Conv2d(in_channels = in_dim//3, out_channels=1, kernel_size=1)
+                )
 
-        self.softmax  = nn.Softmax(dim=-1) #
     def forward(self,x):
         """
         inputs :
@@ -24,21 +46,35 @@ class Vis_Attn(nn.Module):
         out : self attention value + input feature 
         attention: B X N X N (N is Width*Height)
         """
-        m_batchsize,C,width ,height = x.size()
-        proj_query  = self.query_conv(x).view(m_batchsize,-1,width*height).permute(0,2,1) # B X CX(N)
-        proj_key =  self.key_conv(x).view(m_batchsize,-1,width*height) # B X C x (*W*H)
-        energy =  torch.bmm(proj_query,proj_key) # transpose check
-        attention = self.softmax(energy) # BX (N) X (N) 
-        '''
-        #proj_value = self.value_conv(x).view(m_batchsize,-1,width*height) # B X C X N
-        proj_value = x[:, 3:6, :, :].view(m_batchsize, -1, width*height)
+        batch, channel, w, h = x.shape
+        input = x
+        #x1 = self.inc(x)
+        #x2 = self.down1(x1)
+        #x3 = self.down2(x2)
+        #x4 = self.down3(x3)
+        #x5 = self.down4(x4)
+        #x = self.up1(x5, x4)
+        #x = self.up2(x, x3)
+        #x = self.up3(x, x2)
+        #x = self.up4(x, x1)
+        #attention = self.outc(x)
+        #attention = torch.relu(attention)
+        #attention = attention / attention.max()
 
-        out = torch.bmm(proj_value,attention.permute(0,2,1) )
-        out = out.view(m_batchsize,3,width,height)
-        out = self.gamma*out + x[:, 3:6, :, :]
-        '''
-        #return out,attention
-        return attention
+        x_v = self.atten_V(x)
+        x_u = self.atten_U(x)
+        attention = self.atten_gate(torch.mul(x_v, x_u)).view(batch, 1, -1)
+        attention = torch.sigmoid(attention).view(batch, 1, w, h)
+        
+        #attention = torch.softmax(attention, dim=2).view(batch, 1, w, h)
+        #a_max = attention.max(dim=2, keepdim=True)[0]
+        #a_min = attention.min(dim=2, keepdim=True)[0]
+        #attn_norm = (attention - a_min) / (a_max - a_min)
+        #attn_norm = attn_norm.view(batch, 1, w, h)
+
+        #out = torch.mul(input[:, 3:6, :, :], attention) + input[:, 3:6, :, :]
+        out = torch.mul(input[:, 3:6, :, :], attention) 
+        return out, attention
 
 class Temp_Attn(nn.Module):
     def __init__(self, args, device):
