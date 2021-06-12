@@ -54,26 +54,27 @@ def test(model, loader, device, args, logger):
         label = label[0]
         length = length[0]
 
-        imgs_seq = torch.tensor([]).to(device)
-        for seqs in imgs:
-            for num, clip in enumerate(seqs): 
-                for j in range(16):
-                    prev = max(0, j - 1)
-                    post = min(j + 1, 15)
-                    prev = clip.transpose(0, 1)[prev]
-                    cur = clip.transpose(0, 1)[j]
-                    post = clip.transpose(0, 1)[post]
-                    seq = torch.cat((prev, cur, post), dim=0)
-                    imgs_seq = torch.cat((imgs_seq, seq.unsqueeze(0)), dim=0)
+        #imgs_seq = torch.tensor([]).to(device)
+        #for seqs in imgs:
+        #    for num, clip in enumerate(seqs): 
+        #        for j in range(16):
+        #            prev = max(0, j - 1)
+        #            post = min(j + 1, 15)
+        #            prev = clip.transpose(0, 1)[prev]
+        #            cur = clip.transpose(0, 1)[j]
+        #            post = clip.transpose(0, 1)[post]
+        #            seq = torch.cat((prev, cur, post), dim=0)
+        #            imgs_seq = torch.cat((imgs_seq, seq.unsqueeze(0)), dim=0)
+        
+        imgs_seq = imgs.transpose(2, 3).squeeze(0)
+        imgs_seq = imgs_seq.reshape(-1, channel, h, w)
+        first = imgs_seq[0].unsqueeze(0)
+        last = imgs_seq[-1].unsqueeze(0)
+        imgs_prev = torch.cat((first, imgs_seq[:-1]), dim=0)
+        imgs_post = torch.cat((imgs_seq[1:], last), dim=0)
+        imgs_seq = torch.cat((imgs_prev, imgs_seq, imgs_post), dim=1)
         imgs_attn, attn = atten(imgs_seq)
-
-        #imgs = imgs.transpose(2, 3).reshape(-1, channel, h, w)
-        #imgs_diff = torch.abs(imgs[1:] - imgs[:-1])
-        #zero = torch.zeros(imgs[0].shape).unsqueeze(0).to(device)
-        #imgs_diff = torch.cat((zero, imgs_diff, zero), dim=0)
-        #imgs_flow = imgs_diff[1:] + imgs_diff[:-1]
-        #imgs_attn, attn = atten(imgs_flow)
-
+        
         imgs = imgs_attn.view(batch, seq_length, clip_length, channel, h, w).transpose(2, 3)
 
         if label[0] < 0:

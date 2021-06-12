@@ -10,18 +10,6 @@ class Vis_Attn(nn.Module):
     """ Self attention Layer """""
     def __init__(self,in_dim=9):
         super(Vis_Attn,self).__init__()
-        #self.inc = DoubleConv(in_dim, 16)
-        #self.down1 = Down(16, 32)
-        #self.down2 = Down(32, 64)
-        #self.down3 = Down(64, 128)
-        #factor = 2
-        #self.down4 = Down(128, 256 // factor)
-        #self.up1 = Up(256, 128 // factor)
-        #self.up2 = Up(128, 64 // factor)
-        #self.up3 = Up(64, 32 // factor)
-        #self.up4 = Up(32, 16)
-        #self.outc = OutConv(16, 1)
-
         self.D = in_dim // 3
         self.atten_V = nn.Sequential(
                 nn.Conv2d(in_channels = in_dim, out_channels = self.D, kernel_size=5, padding=2),
@@ -39,40 +27,14 @@ class Vis_Attn(nn.Module):
                 )
 
     def forward(self,x):
-        """
-        inputs :
-        x : input feature maps( B X C X W X H )
-        returns :
-        out : self attention value + input feature 
-        attention: B X N X N (N is Width*Height)
-        """
         batch, channel, w, h = x.shape
         input = x
-        #x1 = self.inc(x)
-        #x2 = self.down1(x1)
-        #x3 = self.down2(x2)
-        #x4 = self.down3(x3)
-        #x5 = self.down4(x4)
-        #x = self.up1(x5, x4)
-        #x = self.up2(x, x3)
-        #x = self.up3(x, x2)
-        #x = self.up4(x, x1)
-        #attention = self.outc(x)
-        #attention = torch.relu(attention)
-        #attention = attention / attention.max()
 
         x_v = self.atten_V(x)
         x_u = self.atten_U(x)
         attention = self.atten_gate(torch.mul(x_v, x_u)).view(batch, 1, -1)
         attention = torch.sigmoid(attention).view(batch, 1, w, h)
         
-        #attention = torch.softmax(attention, dim=2).view(batch, 1, w, h)
-        #a_max = attention.max(dim=2, keepdim=True)[0]
-        #a_min = attention.min(dim=2, keepdim=True)[0]
-        #attn_norm = (attention - a_min) / (a_max - a_min)
-        #attn_norm = attn_norm.view(batch, 1, w, h)
-
-        #out = torch.mul(input[:, 3:6, :, :], attention) + input[:, 3:6, :, :]
         out = torch.mul(input[:, 3:6, :, :], attention) 
         return out, attention
 

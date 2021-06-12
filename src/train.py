@@ -60,23 +60,21 @@ def train(model, trainloader, device, optimizer):
         batch, seq_length, channel, clip_length, h, w = imgs.shape
         #feature = torch.nan_to_num(feature)
         label = label.to(device)
-        imgs_seq = torch.tensor([]).to(device)
-        for seqs in imgs:
-            for i, clip in enumerate(seqs): 
-                for j in range(16):
-                    prev = max(0, j - 1)
-                    post = min(j + 1, 15)
-                    prev = clip.transpose(0, 1)[prev]
-                    cur = clip.transpose(0, 1)[j]
-                    post = clip.transpose(0, 1)[post]
-                    seq = torch.cat((prev, cur, post), dim=0)
-                    imgs_seq = torch.cat((imgs_seq, seq.unsqueeze(0)), dim=0)
+
+        imgs_seq = imgs.transpose(2, 3).squeeze(0)
+        imgs_seq = imgs_seq.reshape(-1, channel, h, w)
+        first = imgs_seq[0].unsqueeze(0)
+        last = imgs_seq[-1].unsqueeze(0)
+        imgs_prev = torch.cat((first, imgs_seq[:-1]), dim=0)
+        imgs_post = torch.cat((imgs_seq[1:], last), dim=0)
+        imgs_seq = torch.cat((imgs_prev, imgs_seq, imgs_post), dim=1)
         imgs_attn, attn = atten(imgs_seq)
+        
         imgs = imgs_attn.view(batch, seq_length, clip_length, channel, h, w).transpose(2, 3)
         feature = backbone(imgs.view(-1, 3, 16, 112, 112)).view(batch, 32, -1)
         feature, clusters, output_seg, output_bag, A = net(feature)
         output = torch.sum(output_bag, 1)
-        #output_seg = net.maxminnorm(A)
+
         bag_loss = bagLoss(output.view(-1), label.view(-1).type(torch.float))
         cluster_loss = clusterLoss(feature, label)
         innerbag_loss = innerbagLoss(clusters, label)
