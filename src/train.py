@@ -71,7 +71,7 @@ def train(model, trainloader, device, optimizer):
         imgs_attn, attn = atten(imgs_seq)
         
         imgs = imgs_attn.view(batch, seq_length, clip_length, channel, h, w).transpose(2, 3)
-        imgs = imgs[:, :] - c3d_mean[:, :, 8:120, 30:142]
+        #imgs = imgs[:, :] - c3d_mean[:, :, 8:120, 30:142]
 
         feature = backbone(imgs.view(-1, 3, 16, 112, 112)).view(batch, 32, -1)
         feature, clusters, output_seg, output_bag, A = net(feature)

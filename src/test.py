@@ -62,14 +62,15 @@ def test(model, loader, device, args, logger):
         imgs_seq = torch.cat((imgs_prev, imgs_seq, imgs_post), dim=1)
 
         imgs_attn, attn = atten(imgs_seq)
-        imgs = imgs_attn.view(batch, seq_length, clip_length, channel, h, w).transpose(2, 3)
-        imgs = imgs[:, :] - c3d_mean[:, :, 8:120, 30:142]
+
+        imgs_attn = imgs_attn.view(batch, seq_length, clip_length, channel, h, w).transpose(2, 3)
+        #imgs = imgs[:, :] - c3d_mean[:, :, 8:120, 30:142]
 
         if label[0] < 0:
             baglabel = 0
         else:
             baglabel = 1
-        feature = backbone(imgs.squeeze(0)).unsqueeze(0)
+        feature = backbone(imgs_attn.squeeze(0)).unsqueeze(0)
         feature, clusters, output_seg, bagoutput, A = net(feature)
         bagoutput = torch.sum(bagoutput, 1)
         result.addbag(bagoutput.view(-1).tolist(), [baglabel])
@@ -94,17 +95,35 @@ def test(model, loader, device, args, logger):
             plt.legend()
             logger.savefig(figure, os.path.join('attn', title[0] + '.png'))
 
+        #if args.drawmask:
+        #    for count in range(0, 512):
+        #        seg_count = count // 16
+        #        seg_pos = count % 16
+        #        step = length[seg_count] // 16
+        #        realcount = length[:seg_count].sum() + (step * seg_pos)
+        #        realcount = realcount.item()
+        #        mask = attn[count].view(h, w, 1).cpu().numpy()
+        #        #mask = (mask - mask.min()) / (mask.max() - mask.min())
+        #        #mask = ((1 - mask) * 256).astype(np.uint8)
+        #        mask = (mask * 256).astype(np.uint8)
+        #        mask = cv2.applyColorMap(mask, cv2.COLORMAP_HOT)
+        #        logger.savefig(mask, os.path.join('mask', title[0], str(realcount)+'.png'))
         if args.drawmask:
-            for count in range(0, 512):
-                seg_count = count // 16
-                seg_pos = count % 16
-                step = length[seg_count] // 16
-                realcount = length[:seg_count].sum() + (step * seg_pos)
-                realcount = realcount.item()
-                mask = attn[count].view(h, w, 1).cpu().numpy()
-                #mask = (mask - mask.min()) / (mask.max() - mask.min())
-                #mask = ((1 - mask) * 256).astype(np.uint8)
-                mask = (mask * 256).astype(np.uint8)
-                mask = cv2.applyColorMap(mask, cv2.COLORMAP_HOT)
-                logger.savefig(mask, os.path.join('mask', title[0], str(realcount)+'.png'))
+            attn = attn.view(seq_length, clip_length, 1, h, w).transpose(1, 2)
+            for seq_count in range(seq_length):
+                masks = attn[seq_count] #3, 16, 112, 112
+                img_attn = imgs_attn[0][seq_count] #3, 16, 112, 112
+                img_original = imgs[0][seq_count] + c3d_mean[:, :, 8:120, 30:142] #3, 16, 112, 112
+                img_original = img_original.transpose(0, 1).cpu().numpy()
+                realinputs = img_attn + (c3d_mean[:, :, 8:120, 30:142] * masks) #3, 16, 112, 112
+                realinputs = realinputs.transpose(0, 1).cpu().numpy()
+                step = length[seq_count] // 16
+                for count in range(clip_length):
+                    realcount = length[:seq_count].sum() + (step * count)
+                    realcount = realcount.item()
+                    img_mask = realinputs[count].astype(np.uint8).transpose(1, 2, 0)
+                    img_nomask = img_original[count].astype(np.uint8).transpose(1, 2, 0)
+                    img = np.divide(img_mask, img_nomask, out=np.zeros(img_mask.shape, dtype=float), where=img_nomask!=0)
+                    img = cv2.applyColorMap((img*256).astype(np.uint8), cv2.COLORMAP_BONE)
+                    logger.savefig(img, os.path.join('mask', title[0], str(realcount) + '.png'))
     return result 
