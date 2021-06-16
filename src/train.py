@@ -21,7 +21,6 @@ from datetime import datetime
 
 from tensorboardX import SummaryWriter 
 
-from src.dataset import FrameFolderDataset, SegmentDataset
 from src.pytorch_i3d import InceptionI3d
 from src.backbone import C3D, Vis_Attn, Temp_Attn
 from src.loss import *
@@ -30,6 +29,7 @@ import src.config as config
         
 def train(model, trainloader, device, optimizer):
     backbone, net, atten = model
+    c3d_mean = torch.FloatTensor(trainloader.dataset.mean[0]).to(device)
     backbone.train()
     net.train()
     atten.train()
@@ -71,6 +71,8 @@ def train(model, trainloader, device, optimizer):
         imgs_attn, attn = atten(imgs_seq)
         
         imgs = imgs_attn.view(batch, seq_length, clip_length, channel, h, w).transpose(2, 3)
+        imgs = imgs[:, :] - c3d_mean[:, :, 8:120, 30:142]
+
         feature = backbone(imgs.view(-1, 3, 16, 112, 112)).view(batch, 32, -1)
         feature, clusters, output_seg, output_bag, A = net(feature)
         output = torch.sum(output_bag, 1)

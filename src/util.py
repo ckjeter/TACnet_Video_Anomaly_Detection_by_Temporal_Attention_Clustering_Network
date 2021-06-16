@@ -43,7 +43,7 @@ class AnomalyType(Scorer):
         self.count += 1
 
 class AnomalyVideo(Scorer):
-    def __init__(self, title, feature, predict, label, rawlabel, length, A):
+    def __init__(self, title, feature, predict, label, rawlabel, length):
         super().__init__()
         self.title = title
         self.feature = feature
@@ -51,7 +51,6 @@ class AnomalyVideo(Scorer):
         self.label = label
         self.rawlabel = rawlabel
         self.length = length
-        self.A = A
     def clusterplot(self):
         figure, ax = plt.subplots()
         downsample = TSNE(n_components=2).fit_transform(self.feature.squeeze(0).cpu().detach())
@@ -85,9 +84,7 @@ class AnomalyVideo(Scorer):
         return figure
     def predictplot(self):
         figure, ax = plt.subplots(figsize=(8, 6))
-        plt.plot(self.predict, label='predict')
-        plt.plot(self.A, label = 'Temp Attn')
-        plt.legend()
+        plt.plot(self.predict, label='Predict')
         plt.title(self.title)
         plt.ylim([0, 1])
         plt.xlabel('Frame number')
@@ -118,7 +115,7 @@ class AnomalyResult():
         self.types = {}
         self.scorer = Scorer()
         self.bagscorer = Scorer()
-    def add(self, title, feature, predict, rawlabel, length, A):
+    def add(self, title, feature, predict, rawlabel, length):
         #compute label
         label = [0] * len(predict)
         for i in range(0, 4, 2):
@@ -135,7 +132,7 @@ class AnomalyResult():
         if category not in self.types:
             self.types[category] = AnomalyType(category)
         #add to predictions
-        self.videos[title] = AnomalyVideo(title, feature, predict, label, rawlabel, length, A)
+        self.videos[title] = AnomalyVideo(title, feature, predict, label, rawlabel, length)
         self.types[category].add(predict, label)
         self.scorer.add(predict, label)
     def addbag(self, predict, label):

@@ -20,11 +20,6 @@ class Vis_Attn(nn.Module):
                 nn.Sigmoid()
         )
         self.atten_gate = nn.Conv2d(in_channels = self.D, out_channels = 1, kernel_size=5, padding=2)
-        self.attention = nn.Sequential(
-                nn.Conv2d(in_channels = in_dim, out_channels = in_dim//3, kernel_size=1),
-                nn.Tanh(),
-                nn.Conv2d(in_channels = in_dim//3, out_channels=1, kernel_size=1)
-                )
 
     def forward(self,x):
         batch, channel, w, h = x.shape
@@ -32,8 +27,8 @@ class Vis_Attn(nn.Module):
 
         x_v = self.atten_V(x)
         x_u = self.atten_U(x)
-        attention = self.atten_gate(torch.mul(x_v, x_u)).view(batch, 1, -1)
-        attention = torch.sigmoid(attention).view(batch, 1, w, h)
+        attention = self.atten_gate(torch.mul(x_v, x_u))
+        attention = torch.sigmoid(attention)
         
         out = torch.mul(input[:, 3:6, :, :], attention) 
         return out, attention

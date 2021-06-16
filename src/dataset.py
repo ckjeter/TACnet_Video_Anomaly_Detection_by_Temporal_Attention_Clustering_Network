@@ -66,7 +66,8 @@ class UCFCrime(Dataset):
                 clip = c
             imgs = np.array([np.array(Image.open(path).resize((171, 128), Image.BICUBIC), dtype=np.float) for path in clip])
             imgs = imgs.transpose(3, 0, 1, 2) # (T, H, W, C) => (C, T, H, W)
-            imgs = (imgs - self.mean[0][:, :imgs.shape[1], :, :])[:, :, 8:120, 30:142]
+            #imgs = (imgs - self.mean[0][:, :imgs.shape[1], :, :])[:, :, 8:120, 30:142]
+            imgs = imgs[:, :, 8:120, 30:142]
             if imgs.shape[1] < config.segment_length:
                 imgs = np.pad(imgs, ((0, 0), (0, config.segment_length - imgs.shape[1]), (0, 0), (0, 0)), 'constant')
             imgs = torch.tensor(imgs, dtype=torch.float32)
@@ -89,52 +90,6 @@ class UCFCrime(Dataset):
     def __len__(self):
         return len(self.title)
 
-class FrameFolderDataset(Dataset):
-    def __init__(self, folder_dir, clip_size=config.segment_length):
-        self.framelist = sorted(glob.glob(folder_dir + "/*"), key=lambda x : int(os.path.basename(x).split(".")[0]))
-        self.clips = list(self.chunk_by_clip(self.framelist, clip_size))
-        self.clip_size = clip_size
-        self.mean = np.load('models/c3d_mean.npy') #N, C, T, H, W
-    def __getitem__(self, index):
-        img_paths = self.clips[index]
-        imgs = np.array([np.array(Image.open(path).resize((171, 128), Image.BICUBIC), dtype=np.float) for path in img_paths])
-        imgs = imgs.transpose(3, 0, 1, 2) # (T, H, W, C) => (C, T, H, W)
-        # imgs = imgs[:, :, 8:120, 30:142]
-        imgs = (imgs - self.mean[0][:, :imgs.shape[1], :, :])[:, :, 8:120, 30:142]
-        if imgs.shape[1] < self.clip_size:
-            imgs = np.pad(imgs, ((0, 0), (0, self.clip_size - imgs.shape[1]), (0, 0), (0, 0)), 'constant')
-        imgs = torch.tensor(imgs, dtype=torch.float32)
-        return imgs
-
-    def chunk_by_clip(self, lst, n):
-        for i in range(0, len(lst), n):
-            yield lst[i : i + n]
-
-    def __len__(self):
-        return len(self.clips)
-
-class SegmentDataset(Dataset):
-    def __init__(self, folder_dir, test=False):
-        self.test = test
-        self.labels = []
-        self.features = glob.glob(folder_dir + '/*')
-        self.titles = [os.path.basename(path).split(".")[0] for path in self.features]
-
-    def __getitem__(self, index):
-        title = self.titles[index]
-        if title.find("Normal") >= 0:
-            label = 0
-        else:
-            label = 1
-        data = np.load(self.features[index], allow_pickle=True)
-        framelabel = data[0]
-        feature = data[1]
-        length = data[2]
-        if self.test:
-            return title, feature, framelabel, length
-        return title, feature, label, length
-    def __len__(self):
-        return len(self.titles)
 
 
 
