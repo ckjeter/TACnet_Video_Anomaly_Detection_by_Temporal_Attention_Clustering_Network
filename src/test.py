@@ -35,6 +35,15 @@ def bagexpand(bag, length):
         instances += [float(value)] * (length[i])
     return instances
 
+def histogram(img):
+    color = ('b','g','r')
+    figure, _ = plt.subplots()
+    for i, col in enumerate(color):
+        histr = cv2.calcHist([img],[i],None,[256],[0, 256])
+        plt.plot(histr, color = col)
+        plt.xlim([0, 256])
+    return figure
+
 def test(model, loader, device, args, logger):
     backbone, net, atten = model
     c3d_mean = torch.FloatTensor(loader.dataset.mean[0]).to(device)
@@ -123,7 +132,15 @@ def test(model, loader, device, args, logger):
                     realcount = realcount.item()
                     img_mask = realinputs[count].astype(np.uint8).transpose(1, 2, 0)
                     img_nomask = img_original[count].astype(np.uint8).transpose(1, 2, 0)
-                    img = np.divide(img_mask, img_nomask, out=np.zeros(img_mask.shape, dtype=float), where=img_nomask!=0)
-                    img = cv2.applyColorMap((img*256).astype(np.uint8), cv2.COLORMAP_BONE)
+                    divide = np.divide(img_mask, img_nomask, out=np.zeros(img_mask.shape, dtype=float), where=img_nomask!=0)
+                    divide = cv2.applyColorMap((divide*256).astype(np.uint8), cv2.COLORMAP_BONE)
+                    img = np.concatenate((img_nomask, img_mask, divide), axis=1)
                     logger.savefig(img, os.path.join('mask', title[0], str(realcount) + '.png'))
+
+                    img_mask_histo = histogram(img_mask)
+                    logger.savefig(img_mask_histo, os.path.join('hist_mask', title[0], str(realcount) + '.png'))
+                    plt.close(img_mask_histo)
+                    img_nomask_histo = histogram(img_nomask)
+                    logger.savefig(img_nomask_histo, os.path.join('hist_nomask', title[0], str(realcount) + '.png'))
+                    plt.close(img_nomask_histo)
     return result 
