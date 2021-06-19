@@ -10,11 +10,13 @@ def parse_args():
     parser = argparse.ArgumentParser(description="clean")
     parser.add_argument('--count', type=int, default=1)
     parser.add_argument('--target', type=str, default='')
+    parser.add_argument('--predicttarget', type=str, default='')
     parser.add_argument('--list', action='store_true')
     parser.add_argument('--rank', action='store_true')
     parser.add_argument('--deletelast', action='store_true')
     parser.add_argument('--find', type=str, default='')
     parser.add_argument('--killmode', action='store_true')
+    parser.add_argument('--predictnewest', action='store_true')
     return parser.parse_args()
 
 def getpath(t):
@@ -35,6 +37,10 @@ def getnote(lines):
     if lines[3].find("Note") > 0:
         note = lines[4].split("INFO: ")[1].replace("\n", "")
     return note
+def predict(modelpath):
+    command = "python predict.py --gpus 0 --load_backbone --p_graph --c_graph --drawmask --drawattn --model_path " + modelpath
+    print(command)
+    os.system(command)
 
 class result():
     def __init__(self, name):
@@ -113,4 +119,21 @@ if __name__ == '__main__':
                 pathresult[path].clean()
             else:
                 break
+    if len(args.predicttarget) > 0:
+        target = None
+        for result in results:
+            if args.predicttarget == result.logfolder or args.predicttarget == result.name:
+                target = result
+        assert target != None, 'Target Not Found'
+        epoch = target.scores.index(max(target.scores))
+        ipdb.set_trace()
+        modelpath = os.path.join(args.predicttarget, str(epoch) + '.pth')
+        predict(modelpath)
+
+    if args.predictnewest:
+        target = results[-1]
+        assert target.epoch > 0, "Training incomplete"
+        modelpath = os.path.join(target.logfolder, str(target.epoch - 1) + '.pth')
+        predict(modelpath)
+
             
