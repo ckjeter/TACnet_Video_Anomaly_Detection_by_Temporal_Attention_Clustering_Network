@@ -129,6 +129,28 @@ class converter():
             firstFrame = cv2.convertScaleAbs(avg_float)
             count += 1
         vidcap.release()
+    def saliency(self):
+        path = os.path.join(self.dir, 'saliency')
+        self.mkdir(path)
+        vidcap = cv2.VideoCapture(self.videopath)
+        saliency = None
+        count = 0
+        while True:
+            ret, frame = vidcap.read()
+            if frame is None:
+                break
+            if saliency is None:
+                saliency = cv2.saliency.MotionSaliencyBinWangApr2014_create()
+                saliency.setImagesize(frame.shape[1], frame.shape[0])
+                saliency.init()
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            (success, saliencyMap) = saliency.computeSaliency(gray)
+            saliencyMap = (saliencyMap * 255).astype("uint8")
+            
+            cv2.imwrite(os.path.join(path, '%d.jpg' % count), saliencyMap)
+            count += 1
+        vidcap.release()
+
 
     def optical(self):
         path = os.path.join(self.dir, 'optical')
@@ -166,9 +188,11 @@ if __name__ == '__main__':
     parser.add_argument("--BG_sub", action="store_true")
     parser.add_argument("--optical", action="store_true")
     parser.add_argument("--moving", action="store_true")
+    parser.add_argument("--saliency", action="store_true")
     args = parser.parse_args()
     root = config.root
     data_list = np.genfromtxt(os.path.join(root, "Anomaly_Train.txt"), dtype=str)
+    '''
     for video in data_list:
         if video.find("Normal") >= 0:
             convert = converter(os.path.join(root, video))
@@ -187,6 +211,9 @@ if __name__ == '__main__':
                 convert.optical()
             if args.moving:
                 convert.moving_average()
+            if args.saliency:
+                convert.saliency()
+    '''
     data_list_test = np.genfromtxt(
             os.path.join(root, "Temporal_Anomaly_Annotation_for_Testing_Videos.txt"), dtype=str
     )
@@ -208,4 +235,6 @@ if __name__ == '__main__':
                 convert.optical()
             if args.moving:
                 convert.moving_average()
+            if args.saliency:
+                convert.saliency()
         

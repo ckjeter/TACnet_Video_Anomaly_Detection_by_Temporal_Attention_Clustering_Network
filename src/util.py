@@ -181,7 +181,7 @@ class logger():
             self.writer = SummaryWriter(writerpath)
             self.log.info("create writer: {}".format(writerpath))
     def recordparameter(self):
-        self.log.info("loss = {0[0]}*bag+{0[1]}*cluster+{0[2]}*innerbag+{0[3]}*maxmin+{0[4]}*smooth+{0[5]}*small+{0[6]}*mask".format(config.loss_parameter))
+        self.log.info("loss = {0[0]}*bag+{0[1]}*cluster+{0[2]}*innerbag+{0[3]}*maxmin+{0[4]}*smooth+{0[5]}*small".format(config.loss_parameter))
     def recordloss(self, losses, epoch):
         if self.args.savelog: 
             self.writer.add_scalar('bag_loss', losses[0], epoch)
@@ -193,9 +193,6 @@ class logger():
         )
         self.log.info(
                 "cluster: {:.4f}, innerbag: {:.4f}, maxmin: {:.4f}".format(losses[1], losses[4], losses[3])
-        )
-        self.log.info(
-                "mask: {:.4f}".format(losses[6])
         )
 
     def recordauc(self, result, epoch):
@@ -211,16 +208,13 @@ class logger():
             else:
                 print(k, v.count)
     def savemodel(self, model, epoch):
-        backbone, net, attn = model
+        backbone, net = model
         savepath_C3D = os.path.join(self.root, str(epoch) + 'C3D.pth')
-        savepath_attn = os.path.join(self.root, str(epoch) + 'attn.pth' )
         savepath_net = os.path.join(self.root, str(epoch) + '.pth')
         self.log.info("    Save model: {}".format(savepath_C3D))
-        self.log.info("    Save model: {}".format(savepath_attn))
         self.log.info("    Save model: {}".format(savepath_net))
         torch.save(backbone.state_dict(), savepath_C3D)
         torch.save(net.state_dict(), savepath_net)
-        torch.save(attn.state_dict(), savepath_attn)
     def info(self, message):
         self.log.info(message)
     def savefig(self, figure, path):

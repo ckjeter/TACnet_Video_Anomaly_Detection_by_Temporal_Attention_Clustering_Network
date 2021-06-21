@@ -1,4 +1,5 @@
 import torch
+import cv2
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as transforms
@@ -11,6 +12,55 @@ import glob
 import numpy as np
 import src.config as config
 from tqdm import tqdm
+class UCFCrime_Fast(Dataset):
+    def __init__(self, test=False, use_saliency = False):
+        self.root = config.root
+        self.videolist = []
+        self.use_saliency = use_saliency
+        self.test = test
+        self.weight = 0.3
+        if test:
+            self.root = os.path.join(self.root, 'test/*')
+        else:
+            self.root = os.path.join(self.root, 'train/*')
+        self.mean = np.load('models/c3d_mean.npy') #N, C, T, H, W
+        self.videolist = sorted(glob.glob(self.root))
+    def __getitem__(self, index):
+        path = self.videolist[index]
+        title = os.path.basename(path)
+        imgs = sorted(glob.glob(os.path.join(path, 'frame/*')), 
+                key = lambda x : int(os.path.basename(x).split('.')[0]))
+        imgs = np.array([np.array(Image.open(path), dtype=np.float) for path in imgs])
+
+        if self.use_saliency:
+            saliency = sorted(glob.glob(os.path.join(path, 'saliency/*')), 
+                    key = lambda x : int(os.path.basename(x).split('.')[0]))
+            saliency = np.array([np.array(Image.open(path), dtype=np.float) for path in saliency])
+            saliency[saliency > 0] = 1
+            saliency[saliency == 0] = self.weight
+            saliency = np.repeat(saliency[:, :, :, np.newaxis], 3, axis=3)
+            imgs = imgs * saliency
+        #os.makedirs(os.path.join(path, 'check'), exist_ok=True)
+        #for i in range(512):
+        #    img = imgs[i].astype(np.uint8)
+        #    cv2.imwrite(os.path.join(path, 'check', '%d.jpg' % i), img)
+        imgs = imgs.reshape(32, 16, 112, 112, 3)
+        imgs = imgs.transpose(0, 4, 1, 2, 3)
+        imgs = imgs - self.mean[0, :, :, 8:120, 30:142]
+        imgs = torch.tensor(imgs, dtype=torch.float32)
+        
+        if self.test:
+            label, length = np.load(os.path.join(path, title + '.npy'), allow_pickle=True)
+        else:
+            length = np.load(os.path.join(path, title + '.npy'), allow_pickle=True)
+            if title.find("Normal") >= 0:
+                label = 0
+            else:
+                label = 1
+        return title, imgs, label, length
+    def __len__(self):
+        return len(self.videolist)
+
 
 class UCFCrime(Dataset):
     def __init__(self, test=False, target = 'frame'):
@@ -65,9 +115,11 @@ class UCFCrime(Dataset):
             except:
                 clip = c
             imgs = np.array([np.array(Image.open(path).resize((171, 128), Image.BICUBIC), dtype=np.float) for path in clip])
+            #imgs = np.array([np.array(Image.open(path), dtype=np.uint8) for path in clip])
+            #imgs = np.array([cv2.imread(path) for path in clip])
             imgs = imgs.transpose(3, 0, 1, 2) # (T, H, W, C) => (C, T, H, W)
-            imgs = (imgs - self.mean[0][:, :imgs.shape[1], :, :])[:, :, 8:120, 30:142]
-            #imgs = imgs[:, :, 8:120, 30:142]
+            #imgs = (imgs - self.mean[0][:, :imgs.shape[1], :, :])[:, :, 8:120, 30:142]
+            imgs = imgs[:, :, 8:120, 30:142]
             if imgs.shape[1] < config.segment_length:
                 imgs = np.pad(imgs, ((0, 0), (0, config.segment_length - imgs.shape[1]), (0, 0), (0, 0)), 'constant')
             imgs = torch.tensor(imgs, dtype=torch.float32)

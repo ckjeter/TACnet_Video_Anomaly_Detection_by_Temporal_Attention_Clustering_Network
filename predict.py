@@ -30,28 +30,25 @@ if __name__ == "__main__":
 
     backbone = C3D()
     net = Temp_Attn(args, device)
-    atten = Vis_Attn()
     if multi_gpus:
         backbone = nn.DataParallel(backbone).to(device)
         net = nn.DataParallel(net).to(device)
-        atten = nn.DataParallel(atten).to(device)
     else:
         backbone = backbone.to(device)
         net = net.to(device)
-        atten = atten.to(device)
     if not args.load_backbone:
         backbone.load_state_dict(torch.load("models/c3d.pickle"))
     else:
         backbone.load_state_dict(torch.load(args.model_path.replace(".pth", "C3D.pth")))
     net.load_state_dict(torch.load(args.model_path))
-    atten.load_state_dict(torch.load(args.model_path.replace(".pth", "attn.pth")))
     logger.name = os.path.basename(os.path.dirname(args.model_path))
     #testset = SegmentDataset(args.test_path, test=True)
-    testset = UCFCrime(test=True, target=args.target)
+    #testset = UCFCrime(test=True, target=args.target)
+    testset = UCFCrime_Fast(test=True, use_saliency=True)
     testloader = DataLoader(testset, batch_size=1, shuffle=False)
 
     with torch.no_grad():
-        result = test([backbone, net, atten], testloader, device, args, logger)
+        result = test([backbone, net], testloader, device, args, logger)
     try:
         roc, roc_bag = result.roccurve()
         logger.savefig(roc, "ROC.png")

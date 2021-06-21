@@ -35,21 +35,10 @@ def bagexpand(bag, length):
         instances += [float(value)] * (length[i])
     return instances
 
-def histogram(img):
-    color = ('b','g','r')
-    figure, _ = plt.subplots()
-    for i, col in enumerate(color):
-        histr = cv2.calcHist([img],[i],None,[256],[0, 256])
-        plt.plot(histr, color = col)
-        plt.xlim([0, 256])
-    return figure
-
 def test(model, loader, device, args, logger):
-    backbone, net, atten = model
-    c3d_mean = torch.FloatTensor(loader.dataset.mean[0]).to(device)
+    backbone, net = model
     net.eval()
     backbone.eval()
-    atten.eval()
     torch.manual_seed(777)
     maxauc = 0
     result = AnomalyResult()
@@ -62,24 +51,24 @@ def test(model, loader, device, args, logger):
         label = label[0]
         length = length[0]
 
-        imgs_seq = imgs.transpose(2, 3).squeeze(0)
-        imgs_seq = imgs_seq.reshape(-1, channel, h, w)
-        first = imgs_seq[0].unsqueeze(0)
-        last = imgs_seq[-1].unsqueeze(0)
-        imgs_prev = torch.cat((first, imgs_seq[:-1]), dim=0)
-        imgs_post = torch.cat((imgs_seq[1:], last), dim=0)
-        imgs_seq = torch.cat((imgs_prev, imgs_seq, imgs_post), dim=1)
+        #imgs_seq = imgs.transpose(2, 3).squeeze(0)
+        #imgs_seq = imgs_seq.reshape(-1, channel, h, w)
+        #first = imgs_seq[0].unsqueeze(0)
+        #last = imgs_seq[-1].unsqueeze(0)
+        #imgs_prev = torch.cat((first, imgs_seq[:-1]), dim=0)
+        #imgs_post = torch.cat((imgs_seq[1:], last), dim=0)
+        #imgs_seq = torch.cat((imgs_prev, imgs_seq, imgs_post), dim=1)
 
-        imgs_attn, attn = atten(imgs_seq)
+        #imgs_attn, attn = atten(imgs_seq)
 
-        imgs_attn = imgs_attn.view(batch, seq_length, clip_length, channel, h, w).transpose(2, 3)
+        #imgs_attn = imgs_attn.view(batch, seq_length, clip_length, channel, h, w).transpose(2, 3)
         #imgs = imgs[:, :] - c3d_mean[:, :, 8:120, 30:142]
 
         if label[0] < 0:
             baglabel = 0
         else:
             baglabel = 1
-        feature = backbone(imgs_attn.squeeze(0)).unsqueeze(0)
+        feature = backbone(imgs.squeeze(0)).unsqueeze(0)
         feature, clusters, output_seg, bagoutput, A = net(feature)
         bagoutput = torch.sum(bagoutput, 1)
         result.addbag(bagoutput.view(-1).tolist(), [baglabel])
@@ -104,43 +93,4 @@ def test(model, loader, device, args, logger):
             plt.legend()
             logger.savefig(figure, os.path.join('attn', title[0] + '.png'))
 
-        #if args.drawmask:
-        #    for count in range(0, 512):
-        #        seg_count = count // 16
-        #        seg_pos = count % 16
-        #        step = length[seg_count] // 16
-        #        realcount = length[:seg_count].sum() + (step * seg_pos)
-        #        realcount = realcount.item()
-        #        mask = attn[count].view(h, w, 1).cpu().numpy()
-        #        #mask = (mask - mask.min()) / (mask.max() - mask.min())
-        #        #mask = ((1 - mask) * 256).astype(np.uint8)
-        #        mask = (mask * 256).astype(np.uint8)
-        #        mask = cv2.applyColorMap(mask, cv2.COLORMAP_HOT)
-        #        logger.savefig(mask, os.path.join('mask', title[0], str(realcount)+'.png'))
-        if args.drawmask:
-            attn = attn.view(seq_length, clip_length, 1, h, w).transpose(1, 2)
-            for seq_count in range(seq_length):
-                masks = attn[seq_count] #3, 16, 112, 112
-                img_attn = imgs_attn[0][seq_count] #3, 16, 112, 112
-                img_original = imgs[0][seq_count] + c3d_mean[:, :, 8:120, 30:142] #3, 16, 112, 112
-                img_original = img_original.transpose(0, 1).cpu().numpy()
-                realinputs = img_attn + (c3d_mean[:, :, 8:120, 30:142] * masks) #3, 16, 112, 112
-                realinputs = realinputs.transpose(0, 1).cpu().numpy()
-                step = length[seq_count] // 16
-                for count in range(clip_length):
-                    realcount = length[:seq_count].sum() + (step * count)
-                    realcount = realcount.item()
-                    img_mask = realinputs[count].astype(np.uint8).transpose(1, 2, 0)
-                    img_nomask = img_original[count].astype(np.uint8).transpose(1, 2, 0)
-                    divide = np.divide(img_mask, img_nomask, out=np.zeros(img_mask.shape, dtype=float), where=img_nomask!=0)
-                    divide = cv2.applyColorMap((divide*256).astype(np.uint8), cv2.COLORMAP_BONE)
-                    img = np.concatenate((img_nomask, img_mask, divide), axis=1)
-                    logger.savefig(img, os.path.join('mask', title[0], str(realcount) + '.png'))
-
-                    img_mask_histo = histogram(img_mask)
-                    logger.savefig(img_mask_histo, os.path.join('hist_mask', title[0], str(realcount) + '.png'))
-                    plt.close(img_mask_histo)
-                    img_nomask_histo = histogram(img_nomask)
-                    logger.savefig(img_nomask_histo, os.path.join('hist_nomask', title[0], str(realcount) + '.png'))
-                    plt.close(img_nomask_histo)
     return result 
