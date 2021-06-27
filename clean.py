@@ -32,13 +32,22 @@ def getscore(lines):
             aucs.append(float(l.split("AUC: ")[1]))
     return aucs
 
+def getmodel(lines):
+    models = []
+    for i, l in enumerate(lines):
+        if l.find("Save model:") > 0 and l.find("C3D") < 0 and l.find("attn") < 0:
+            path = l.split("Save model: ")[1][:-1]
+            models.append(path)
+    return models
+        
+
 def getnote(lines):
     note = ''
     if lines[3].find("Note") > 0:
         note = lines[4].split("INFO: ")[1].replace("\n", "")
     return note
 def predict(modelpath):
-    command = "python predict.py --gpus 0 --load_backbone --p_graph --c_graph --drawmask --drawattn --model_path " + modelpath
+    command = "python predict.py --gpus 0 --load_backbone --model_path " + modelpath
     print(command)
     os.system(command)
 
@@ -48,6 +57,7 @@ class result():
         self.logfolder, self.logfile, self.writer = getpath(name)
         self.lines = open(self.logfile).readlines()
         self.scores = getscore(self.lines)
+        self.model_path = getmodel(self.lines)
         self.epoch = len(self.scores)
         self.note = getnote(self.lines)
     def __gt__(self, other):
@@ -125,14 +135,19 @@ if __name__ == '__main__':
             if args.predicttarget == result.logfolder or args.predicttarget == result.name:
                 target = result
         assert target != None, 'Target Not Found'
-        epoch = target.scores.index(max(target.scores))
-        ipdb.set_trace()
-        modelpath = os.path.join(args.predicttarget, str(epoch) + '.pth')
-        predict(modelpath)
+        #index = target.scores.index(max(target.scores))
+        #modelpath = target.model_path[index]
+        #predict(modelpath)
+        for i, path in enumerate(target.model_path):
+            predict(path)
+            print("Formal Score: " + str(target.scores[i]))
+            print("")
 
     if args.predictnewest:
         target = results[-1]
         assert target.epoch > 0, "Training incomplete"
+        index = target.scores.index(max(target.scores))
+        modelpath = target.model_path[index]
         modelpath = os.path.join(target.logfolder, str(target.epoch - 1) + '.pth')
         predict(modelpath)
 

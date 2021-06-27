@@ -51,19 +51,6 @@ def test(model, loader, device, args, logger):
         label = label[0]
         length = length[0]
 
-        #imgs_seq = imgs.transpose(2, 3).squeeze(0)
-        #imgs_seq = imgs_seq.reshape(-1, channel, h, w)
-        #first = imgs_seq[0].unsqueeze(0)
-        #last = imgs_seq[-1].unsqueeze(0)
-        #imgs_prev = torch.cat((first, imgs_seq[:-1]), dim=0)
-        #imgs_post = torch.cat((imgs_seq[1:], last), dim=0)
-        #imgs_seq = torch.cat((imgs_prev, imgs_seq, imgs_post), dim=1)
-
-        #imgs_attn, attn = atten(imgs_seq)
-
-        #imgs_attn = imgs_attn.view(batch, seq_length, clip_length, channel, h, w).transpose(2, 3)
-        #imgs = imgs[:, :] - c3d_mean[:, :, 8:120, 30:142]
-
         if label[0] < 0:
             baglabel = 0
         else:

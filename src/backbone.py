@@ -3,7 +3,6 @@ import torch.nn as nn
 from torchvision import models
 import torch.nn.functional as F
 from kmeans_pytorch import kmeans
-#from .unet_parts import *
 import ipdb
 
 class Temp_Attn(nn.Module):

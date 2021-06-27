@@ -46,10 +46,10 @@ class InnerBagLoss(nn.Module):
                 #loss += abs(maxscore - minscore)
                 #return abs(c1.mean() - c2.mean())
             else:
-                c_a = c1[i] if c1[i].max() >= c2[i].max() else c2[i]
-                c_n = c2[i] if c2[i].max() < c1[i].max() else c1[i]
-                maxscore = max(c1[i].max(), c2[i].max())
-                minscore = min(c1[i].min(), c2[i].min())
+                c_a = c1[i] if c1[i].mean() >= c2[i].mean() else c2[i]
+                c_n = c2[i] if c2[i].mean() < c1[i].mean() else c1[i]
+                #maxscore = max(c1[i].max(), c2[i].max())
+                #minscore = min(c1[i].min(), c2[i].min())
                 #anomaly
                 onelabel = torch.ones(c_a.shape[0]).to(self.device)
                 #zerolabel = torch.zeros(c_n.shape[0]).to(self.device)
@@ -78,11 +78,10 @@ class SmoothLoss(nn.Module):
         self.quantize = quantize
     def forward(self, output_seg):
         loss = 0
-        for A in output_seg:
-            loss += (A[0] - A[1])**2
-            for i in range(1, len(A)-1):
-                loss += (A[i] - A[i + 1])**2
-        '''
+        #for A in output_seg:
+        #    loss += (A[0] - A[1])**2
+        #    for i in range(1, len(A)-1):
+        #        loss += (A[i] - A[i + 1])**2
         for A in output_seg:
             predict_in_range = torch.floor(A.div(1/self.quantize))
             for x in range(0, int(self.quantize)):
@@ -90,7 +89,6 @@ class SmoothLoss(nn.Module):
                 prob = x_count / len(A)
                 if prob != 0:
                     loss += -1 * prob * torch.log2(prob)
-        '''
         return loss
 
 class SmallLoss(nn.Module):

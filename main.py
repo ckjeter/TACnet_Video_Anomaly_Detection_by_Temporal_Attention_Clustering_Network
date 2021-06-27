@@ -38,11 +38,11 @@ def main():
 
     #----------Prepare Datasets----------
     #trainset = SegmentDataset(args.train_path)
-    trainset = UCFCrime_Fast(test=False, use_saliency=args.use_saliency)
+    trainset = UCFCrime_Fast(mode='train_resize', use_saliency=args.use_saliency)
     trainloader = DataLoader(trainset, batch_size = args.batch_size, shuffle=True)
         
     #testset = SegmentDataset(args.test_path, test=True)
-    testset = UCFCrime_Fast(test=True, use_saliency=args.use_saliency)
+    testset = UCFCrime_Fast(mode='test_resize', use_saliency=args.use_saliency)
     testloader = DataLoader(testset, batch_size=1, shuffle=False)
     
     #----------Prepare Models----------

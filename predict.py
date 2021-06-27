@@ -44,7 +44,8 @@ if __name__ == "__main__":
     logger.name = os.path.basename(os.path.dirname(args.model_path))
     #testset = SegmentDataset(args.test_path, test=True)
     #testset = UCFCrime(test=True, target=args.target)
-    testset = UCFCrime_Fast(test=True, use_saliency=True)
+    #testset = UCFCrime_Fast(mode='test_resize', use_saliency=args.use_saliency, check=True, image_path=args.model_path)
+    testset = UCFCrime_Fast(mode='test_resize', use_saliency=args.use_saliency)
     testloader = DataLoader(testset, batch_size=1, shuffle=False)
 
     with torch.no_grad():
