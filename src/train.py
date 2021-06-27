@@ -19,9 +19,6 @@ from tqdm import tqdm
 import ipdb
 from datetime import datetime
 
-from tensorboardX import SummaryWriter 
-
-from src.pytorch_i3d import InceptionI3d
 from src.backbone import *
 from src.loss import *
 from src.util import Averager

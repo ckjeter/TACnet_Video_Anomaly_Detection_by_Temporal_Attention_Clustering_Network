@@ -97,11 +97,3 @@ class SmallLoss(nn.Module):
         for A in output_seg:
             loss += A.sum()
         return loss
-
-class MaskLoss(nn.Module):
-    def forward(self, attn):
-        attn = attn.view(attn.shape[0], -1)
-        loss = 1 - torch.max(attn, dim=1)[0] + torch.min(attn, dim=1)[0]
-        loss = loss.mean()
-        
-        return loss
