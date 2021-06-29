@@ -43,29 +43,23 @@ class AnomalyType(Scorer):
         self.count += 1
 
 class AnomalyVideo(Scorer):
-    def __init__(self, title, feature, predict, label, rawlabel, length):
+    def __init__(self, title, feature, predict, label, length):
         super().__init__()
         self.title = title
         self.feature = feature
         self.predict = predict
         self.label = label
-        self.rawlabel = rawlabel
         self.length = length
     def clusterplot(self):
         figure, ax = plt.subplots()
         downsample = TSNE(n_components=2).fit_transform(self.feature.squeeze(0).cpu().detach())
-        framelabel = [0] * len(self.predict)
-        for i in range(0, 4, 2):
-            if self.rawlabel[i] != -1:
-                framelabel[int(self.rawlabel[i]):int(self.rawlabel[i+1]+1)] \
-                = [1] * (int(self.rawlabel[i+1])-int(self.rawlabel[i]) + 1)
         newlabel = []
         output_seg = []
         start = 0
         for l in self.length:
             if l == 0:
                 break
-            newlabel.append(framelabel[start])
+            newlabel.append(self.label[start])
             output_seg.append(self.predict[start])
             start += l.item()
         output_seg = np.array(output_seg)
@@ -91,10 +85,10 @@ class AnomalyVideo(Scorer):
         plt.ylabel('Anomaly score')
         plt.xticks([0, len(self.predict)-1])
         ticks = [0]
-        for i in range(0, len(self.rawlabel), 2):
-            if self.rawlabel[i] != -1:
-                ax.add_patch(Rectangle((self.rawlabel[i], 0)
-                    , self.rawlabel[i+1]-self.rawlabel[i], 1, color='red', alpha=0.5))
+        for i in range(len(self.label)):
+            if self.label[i] == 1:
+                ax.add_patch(Rectangle((i, 0)
+                    , 1, 1, color='red', alpha=0.5))
                 #ticks.append(self.rawlabel[i])
                 #ticks.append(self.rawlabel[i+1])
         for i in range(0, len(self.predict), len(self.predict)//10):
@@ -115,24 +109,13 @@ class AnomalyResult():
         self.types = {}
         self.scorer = Scorer()
         self.bagscorer = Scorer()
-    def add(self, title, feature, predict, rawlabel, length):
+    def add(self, title, feature, predict, label, length):
         #compute label
-        label = [0] * len(predict)
-        for i in range(0, 4, 2):
-            if rawlabel[i].item() != -1:
-                start = max(0, rawlabel[i].item()-1)
-                end = min(len(predict), rawlabel[i+1].item())
-                label[start:end] = [1] * (end - start)
-                if len(label) != len(predict):
-                    ipdb.set_trace()
         #detect category
-        category = title[:-3]
-        if category.find("Normal") >= 0:
-            category = "Normal"
-        if category not in self.types:
-            self.types[category] = AnomalyType(category)
+        category = title.split("_")[0]
+        self.types[category] = AnomalyType(category)
         #add to predictions
-        self.videos[title] = AnomalyVideo(title, feature, predict, label, rawlabel, length)
+        self.videos[title] = AnomalyVideo(title, feature, predict, label, length)
         self.types[category].add(predict, label)
         self.scorer.add(predict, label)
     def addbag(self, predict, label):
@@ -223,10 +206,8 @@ class logger():
         if not os.path.exists(folder):
             os.mkdir(folder)
         '''
-        path = os.path.join('image', self.name, path)
-        if not os.path.exists(os.path.dirname(path)):
-            #os.mkdir(os.path.dirname(path))
-            os.makedirs(os.path.dirname(path), exist_ok=True)
+        path = os.path.join(config.root, 'image', self.name, path)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         try:
             figure.savefig(path)
             plt.close(figure)

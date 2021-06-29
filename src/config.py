@@ -1,6 +1,6 @@
 import argparse
 import os
-root = "/data/dataset/UCF_Crime"
+root = "/data/dataset/ShanghaiTech"
 segment_length = 16
 segment_count = 32
 fix_length = True 
@@ -10,7 +10,7 @@ else:
     token = 'C' + str(segment_length)
 train_path = os.path.join(root, 'features', token, 'train')
 test_path = os.path.join(root, 'features', token, 'test')
-loss_parameter = [1, 0.01, 0.3, 0.3, 0.001, 0.001]
+loss_parameter = [0.5, 0, 0, 0.5, 1, 0.001]
 #loss_parameter = [0.5, 0.01, 0.1, 0.3, 0.01, 0.001]
 def parse_args():
     parser = argparse.ArgumentParser(description="fuck")
@@ -19,7 +19,7 @@ def parse_args():
     parser.add_argument('--train_path', type=str, default=train_path)
     parser.add_argument('--test_path', type=str, default=test_path)
     parser.add_argument('--attention_type', type=str, default='normal')
-    parser.add_argument('--epoch', type=int, default=300)
+    parser.add_argument('--epoch', type=int, default=50)
     parser.add_argument('--lr', type=float, default=1e-5)
     parser.add_argument('--batch_size', type=int, default=1)
     parser.add_argument('--root', type=str, default='')

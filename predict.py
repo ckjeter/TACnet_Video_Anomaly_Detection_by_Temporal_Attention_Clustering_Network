@@ -45,7 +45,8 @@ if __name__ == "__main__":
     #testset = SegmentDataset(args.test_path, test=True)
     #testset = UCFCrime(test=True, target=args.target)
     #testset = UCFCrime_Fast(mode='test_resize', use_saliency=args.use_saliency, check=True, image_path=args.model_path)
-    testset = UCFCrime_Fast(mode='test_resize', use_saliency=args.use_saliency)
+    #testset = UCFCrime_Fast(mode='test_resize', use_saliency=args.use_saliency)
+    testset = ShanghaiTech(mode='test')
     testloader = DataLoader(testset, batch_size=1, shuffle=False)
 
     with torch.no_grad():
@@ -56,5 +57,5 @@ if __name__ == "__main__":
         logger.savefig(roc_bag, "BagROC.png")
     except:
         ipdb.set_trace()
-    logger.auc_types(result)
+    #logger.auc_types(result)
     logger.recordauc(result, 0)

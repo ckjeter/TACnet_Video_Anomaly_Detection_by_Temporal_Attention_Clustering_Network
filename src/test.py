@@ -51,10 +51,11 @@ def test(model, loader, device, args, logger):
         label = label[0]
         length = length[0]
 
-        if label[0] < 0:
-            baglabel = 0
-        else:
+        if (label == 1).nonzero(as_tuple=True)[0].shape[0] > 0: #anomaly
             baglabel = 1
+        else:
+            baglabel = 0
+
         feature = backbone(imgs.squeeze(0)).unsqueeze(0)
         feature, clusters, output_seg, bagoutput, A = net(feature)
         bagoutput = torch.sum(bagoutput, 1)
