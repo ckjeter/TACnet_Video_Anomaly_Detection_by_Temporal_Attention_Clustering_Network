@@ -16,7 +16,6 @@ from tqdm import tqdm
 import ipdb
 
 from src.dataset import *
-from src.pytorch_i3d import InceptionI3d
 from src.backbone import *
 from src.test import test
 from src.train import train
@@ -68,7 +67,7 @@ def main():
         {'params': net.parameters(), 'lr': args.lr},
     ])
     #optimizer = optim.SGD(net.parameters(), momentum=0.5, lr=args.lr)
-    scheduler = MultiStepLR(optimizer, [10, 20, 30], gamma=0.1)
+    scheduler = MultiStepLR(optimizer, [20, 30, 40], gamma=0.1)
     
     logger.recordparameter()
     model = [backbone, net]

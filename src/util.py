@@ -10,6 +10,7 @@ from matplotlib.patches import Rectangle
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 import src.config as config 
+import glob
 import os
 import ipdb
 
@@ -101,12 +102,12 @@ class AnomalyVideo(Scorer):
             ticks.append(i)
         #ticks.append(len(self.predict)-1)
         plt.xticks(ticks)
-        try:
-            props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
-            text = "AUC: " + str(self.auc())[:4]
-            plt.text(0, 1.05, text, bbox=props)
-        except:
-            pass
+        #try:
+        #    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+        #    text = "AUC: " + str(self.auc())[:4]
+        #    plt.text(0, 1.05, text, bbox=props)
+        #except:
+        #    pass
         return figure
 
 class AnomalyResult():
@@ -145,9 +146,21 @@ class AnomalyResult():
         def draw(scorer, title='ROC curve'):
             fpr, tpr, t = roc_curve(scorer.label, scorer.predict)
             figure, ax = plt.subplots()
-            plt.plot(fpr, tpr, color='darkorange',
-                             lw=2, label='ROC curve (area = %0.2f)' % scorer.auc())
-            plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+            plt.plot(fpr, tpr, color='red',
+                             lw=2, label='Ours')
+            for other in glob.glob('/data/dataset/UCF_Crime/data/ROC/*'):
+                mat = np.load(other, allow_pickle=True)
+                name = os.path.basename(other).split(".")[0]
+                if name.find('et al') > 0:
+                    name += '.'
+                #fpr, tpr, t = roc_curve(mat.T[1], mat.T[0])
+                plt.plot(mat.T[0], mat.T[1], lw=1, ls='--', label=name)
+
+            
+            #plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+            plt.xticks(np.arange(0., 1.01, step=0.1))
+            plt.yticks(np.arange(0., 1.01, step=0.1))
+            plt.grid(alpha=0.2)
             plt.xlim([0.0, 1.0])
             plt.ylim([0.0, 1.0])
             plt.xlabel('False Positive Rate')
@@ -155,7 +168,8 @@ class AnomalyResult():
             plt.title(title)
             plt.legend(loc="lower right")
             return figure
-        return draw(self.scorer), draw(self.bagscorer, 'Bag ROC curve')
+        #return draw(self.scorer), draw(self.bagscorer, 'Bag ROC curve')
+        return draw(self.scorer)
     def clusterplot(self, title):
         #figure = self.videos[title].clusterplot()
         #figure.savefig(title + "_features.png")

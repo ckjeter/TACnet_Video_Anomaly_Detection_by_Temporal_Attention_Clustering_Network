@@ -46,6 +46,14 @@ def getnote(lines):
     if lines[3].find("Note") > 0:
         note = lines[4].split("INFO: ")[1].replace("\n", "")
     return note
+
+def getloss(lines):
+    loss = ''
+    for l in lines:
+        if l.find('loss = ') > 0:
+            loss = l.split("= ")[1][:-1]
+            break
+    return loss
 def predict(modelpath):
     command = "python predict.py --gpus 0 --load_backbone --model_path " + modelpath
     print(command)
@@ -60,6 +68,7 @@ class result():
         self.model_path = getmodel(self.lines)
         self.epoch = len(self.scores)
         self.note = getnote(self.lines)
+        self.loss = getloss(self.lines)
     def __gt__(self, other):
         assert self.epoch > 0 and other.epoch > 0, 'experiment ungoing'
         return max(self.scores) > max(other.scores)
@@ -69,13 +78,15 @@ class result():
                     \nEpoch: {}\
                     \nBest: {}\
                     \nNote: {}\
-                    \n".format(self.logfolder, len(self.scores), max(self.scores), self.note)
+                    \nLoss: {}\
+                    \n".format(self.logfolder, len(self.scores), max(self.scores), self.note, self.loss)
         else:
             return "{}\
                     \nEpoch: 0\
                     \nBest: -\
                     \nNote: {}\
-                    \n".format(self.logfolder, self.note)
+                    \nLoss: {}\
+                    \n".format(self.logfolder, self.note, self.loss)
     def clean(self):
         print("Target:")
         print(self)

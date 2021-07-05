@@ -10,7 +10,8 @@ else:
     token = 'C' + str(segment_length)
 train_path = os.path.join(root, 'features', token, 'train')
 test_path = os.path.join(root, 'features', token, 'test')
-loss_parameter = [1, 0.01, 0.3, 0.3, 0.001, 0.001]
+#loss_parameter = [0.7, 0, 0.5, 0.5, 0.001, 0.001]
+loss_parameter = [1, 0, 0.5, 0.3, 0.05, 0.05]
 #loss_parameter = [0.5, 0.01, 0.1, 0.3, 0.01, 0.001]
 def parse_args():
     parser = argparse.ArgumentParser(description="fuck")

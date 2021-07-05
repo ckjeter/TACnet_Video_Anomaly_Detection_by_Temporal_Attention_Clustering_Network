@@ -60,7 +60,7 @@ def test(model, loader, device, args, logger):
         bagoutput = torch.sum(bagoutput, 1)
         result.addbag(bagoutput.view(-1).tolist(), [baglabel])
         
-        if bagoutput.item() < -1:
+        if bagoutput.item() < 0:
             framepredict = [0] * (sum(length).item())
         else:
             framepredict = bagexpand(output_seg[0].cpu().tolist(), length)
@@ -76,7 +76,7 @@ def test(model, loader, device, args, logger):
             #A = (A - A.min()) / (A.max() - A.min())
             A = bagexpand(A.cpu().tolist(), length)
             figure = result.predictplot(title[0])
-            plt.plot(A, label="Temp Attn", color='green')
+            plt.plot(A, ls='--', label="Temp Attn", color='green')
             plt.legend()
             logger.savefig(figure, os.path.join('attn', title[0] + '.png'))
 

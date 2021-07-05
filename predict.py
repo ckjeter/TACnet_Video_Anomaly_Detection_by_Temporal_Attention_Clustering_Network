@@ -50,11 +50,7 @@ if __name__ == "__main__":
 
     with torch.no_grad():
         result = test([backbone, net], testloader, device, args, logger)
-    try:
-        roc, roc_bag = result.roccurve()
-        logger.savefig(roc, "ROC.png")
-        logger.savefig(roc_bag, "BagROC.png")
-    except:
-        ipdb.set_trace()
+    roc = result.roccurve()
+    logger.savefig(roc, "ROC.png")
     logger.auc_types(result)
     logger.recordauc(result, 0)

@@ -35,6 +35,7 @@ class Temp_Attn(nn.Module):
         self.attention_gate = nn.Linear(self.D, 1)
         self.c_bag = self.classifier(self.L)
         self.c_segment = self.classifier(self.L + 1)
+        #self.c_segment = self.classifier(self.L)
     def classifier(self, input_dim):
         return nn.Sequential(
             nn.Linear(input_dim, self.D),
@@ -62,15 +63,17 @@ class Temp_Attn(nn.Module):
         feature = self.tsn(feature.transpose(1, 2)).transpose(1, 2)
 
         #Attention path
+        #A = None
         if self.attention_type == 'normal':
             A = self.attention(feature) 
         elif self.attention_type == 'gate':
             A_V = self.attention_V(feature)
             A_U = self.attention_U(feature)
             A = self.attention_gate(A_V * A_U)
-        #A: 1, 32, 1
+        ##A: 1, 32, 1
         A = torch.transpose(A, 1, 2) #1, 1, 32
         bag = torch.bmm(F.softmax(A, dim=2), feature).squeeze(1) #1, self.L
+        #bag = feature.mean(dim=1)
         #bag = torch.bmm(A, feature)
         #output1 = torch.sigmoid(self.c_bag(torch.cat((bag, hidden[-1]), dim=1))).view(-1)
         output1 = torch.sigmoid(self.c_bag(bag)).view(-1) #1, 1
@@ -84,6 +87,7 @@ class Temp_Attn(nn.Module):
         #key point
         #concate? multiply?
         output_seg = self.c_segment(torch.cat((feature, A.view(batch_size, 32, 1)), dim=2)).squeeze(2)
+        #output_seg = self.c_segment(feature).squeeze(2)
         output_seg = torch.sigmoid(output_seg)
         #1, 32
         #attention_boost = 2 * torch.sigmoid(A).squeeze(1)
@@ -111,6 +115,7 @@ class Temp_Attn(nn.Module):
             #key point
             out = max(c1.mean(), c2.mean()).view(-1)
             #out = output_seg[i].max().view(-1)
+            #out = output_seg[i].mean().view(-1)
 
             cluster1.append(c1)
             cluster2.append(c2)
