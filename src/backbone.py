@@ -12,12 +12,12 @@ class Temp_Attn(nn.Module):
         self.device = device
         self.L = 256
         self.D = 256
-        self.mlp1 = nn.Sequential(
-            nn.Linear(4096, 4096),
-            nn.ReLU(),
-            nn.Linear(4096, self.L)
-        )
-        self.rnn = nn.GRU(4096, self.L, 2, batch_first=True)
+        #self.mlp1 = nn.Sequential(
+        #    nn.Linear(4096, 4096),
+        #    nn.ReLU(),
+        #    nn.Linear(4096, self.L)
+        #)
+        #self.rnn = nn.GRU(4096, self.L, 2, batch_first=True)
         self.tsn = nn.Conv1d(in_channels=4096, out_channels=self.L, kernel_size=3, padding=1)
         self.attention = nn.Sequential(
             nn.Linear(self.L, self.D),

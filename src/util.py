@@ -85,22 +85,29 @@ class AnomalyVideo(Scorer):
         plt.ylabel('Anomaly score')
         plt.xticks([0, len(self.predict)-1])
         ticks = [0]
+
+        flag = 0
+        start = -1
         for i in range(len(self.label)):
-            if self.label[i] == 1:
-                ax.add_patch(Rectangle((i, 0)
-                    , 1, 1, color='red', alpha=0.5))
+            if self.label[i] > flag: #0 -> 1
+                start = i
+                flag = self.label[i]
+            if self.label[i] < flag: #1 -> 0
+                ax.add_patch(Rectangle((start, 0)
+                    , i - start, 1, color='red', alpha=0.5))
                 #ticks.append(self.rawlabel[i])
                 #ticks.append(self.rawlabel[i+1])
+                flag = 0
         for i in range(0, len(self.predict), len(self.predict)//10):
             ticks.append(i)
         #ticks.append(len(self.predict)-1)
         plt.xticks(ticks)
-        try:
-            props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
-            text = "AUC: " + str(self.auc())[:4]
-            plt.text(0, 1.05, text, bbox=props)
-        except:
-            pass
+        #try:
+        #    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+        #    text = "AUC: " + str(self.auc())[:4]
+        #    plt.text(0, 1.05, text, bbox=props)
+        #except:
+        #    pass
         return figure
 
 class AnomalyResult():
