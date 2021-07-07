@@ -85,7 +85,7 @@ class AnomalyVideo(Scorer):
         return figure
     def predictplot(self):
         figure, ax = plt.subplots(figsize=(8, 6))
-        plt.plot(self.predict, label='Predict')
+        plt.plot(self.predict, label='Predict', lw=2)
         plt.title(self.title)
         plt.ylim([0, 1])
         plt.xlabel('Frame number')
@@ -95,7 +95,7 @@ class AnomalyVideo(Scorer):
         for i in range(0, len(self.rawlabel), 2):
             if self.rawlabel[i] != -1:
                 ax.add_patch(Rectangle((self.rawlabel[i], 0)
-                    , self.rawlabel[i+1]-self.rawlabel[i], 1, color='red', alpha=0.5))
+                    , self.rawlabel[i+1]-self.rawlabel[i], 1, color='red', alpha=0.2))
                 #ticks.append(self.rawlabel[i])
                 #ticks.append(self.rawlabel[i+1])
         for i in range(0, len(self.predict), len(self.predict)//10):

@@ -76,7 +76,7 @@ def test(model, loader, device, args, logger):
             #A = (A - A.min()) / (A.max() - A.min())
             A = bagexpand(A.cpu().tolist(), length)
             figure = result.predictplot(title[0])
-            plt.plot(A, ls='--', label="Temp Attn", color='green')
+            plt.plot(A, ls='--', label="Temp Attn", color='green', lw=2)
             plt.legend()
             logger.savefig(figure, os.path.join('attn', title[0] + '.png'))
 
