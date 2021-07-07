@@ -84,11 +84,9 @@ class AnomalyVideo(Scorer):
         plt.legend()
         return figure
     def predictplot(self):
-        figure, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6))
-        plt.subplots_adjust(hspace=0)
+        figure, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 6), gridspec_kw={'height_ratios':[2, 1]})
         ax1.set_title(self.title)
-        ax1.set_xticks([])
-        ax1.set_yticks([])
+        ax1.axis('off')
         ax2.plot(self.predict, label='Predict', lw=2)
         ax2.set_ylim([0, 1])
         ax2.set_xlabel('Frame number')
