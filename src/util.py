@@ -77,13 +77,15 @@ class AnomalyVideo(Scorer):
         plt.legend()
         return figure
     def predictplot(self):
-        figure, ax = plt.subplots(figsize=(8, 6))
-        plt.plot(self.predict, label='Predict', lw=2)
-        plt.title(self.title)
-        plt.ylim([0, 1])
-        plt.xlabel('Frame number')
-        plt.ylabel('Anomaly score')
-        plt.xticks([0, len(self.predict)-1])
+        figure, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6), gridspec_kw={'height_ratios':[2, 1]})
+        ax1.set_title(self.title)
+        ax1.axis('off')
+        ax2.plot(self.predict, label='Predict', lw=2)
+        #ax2.title(self.title)
+        ax2.set_ylim([0, 1])
+        ax2.set_xlabel('Frame number')
+        ax2.set_ylabel('Anomaly score')
+        ax2.set_xticks([0, len(self.predict)-1])
         ticks = [0]
 
         flag = 0
@@ -93,7 +95,7 @@ class AnomalyVideo(Scorer):
                 start = i
                 flag = self.label[i]
             if self.label[i] < flag: #1 -> 0
-                ax.add_patch(Rectangle((start, 0)
+                ax2.add_patch(Rectangle((start, 0)
                     , i - start, 1, color='red', alpha=0.2))
                 #ticks.append(self.rawlabel[i])
                 #ticks.append(self.rawlabel[i+1])
@@ -101,7 +103,7 @@ class AnomalyVideo(Scorer):
         for i in range(0, len(self.predict), len(self.predict)//10):
             ticks.append(i)
         #ticks.append(len(self.predict)-1)
-        plt.xticks(ticks)
+        ax2.set_xticks(ticks)
         #try:
         #    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
         #    text = "AUC: " + str(self.auc())[:4]
