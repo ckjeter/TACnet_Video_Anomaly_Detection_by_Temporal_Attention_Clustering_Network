@@ -77,8 +77,8 @@ class AnomalyVideo(Scorer):
         plt.legend()
         return figure
     def predictplot(self):
-        figure, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6), gridspec_kw={'height_ratios':[2, 1]})
-        ax1.set_title(self.title)
+        figure, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 6), gridspec_kw={'height_ratios':[2, 1]})
+        ax1.set_title(self.title.split(".")[0])
         ax1.axis('off')
         ax2.plot(self.predict, label='Predict', lw=2)
         #ax2.title(self.title)
@@ -86,15 +86,18 @@ class AnomalyVideo(Scorer):
         ax2.set_xlabel('Frame number')
         ax2.set_ylabel('Anomaly score')
         ax2.set_xticks([0, len(self.predict)-1])
-        ticks = [0]
+        ticks = []
 
         flag = 0
         start = -1
+        savelabel = []
         for i in range(len(self.label)):
             if self.label[i] > flag: #0 -> 1
                 start = i
+                savelabel.append(start)
                 flag = self.label[i]
             if self.label[i] < flag: #1 -> 0
+                savelabel.append(i)
                 ax2.add_patch(Rectangle((start, 0)
                     , i - start, 1, color='red', alpha=0.2))
                 #ticks.append(self.rawlabel[i])
