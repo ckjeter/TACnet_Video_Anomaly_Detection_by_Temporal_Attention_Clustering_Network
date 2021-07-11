@@ -90,14 +90,11 @@ class AnomalyVideo(Scorer):
 
         flag = 0
         start = -1
-        savelabel = []
         for i in range(len(self.label)):
             if self.label[i] > flag: #0 -> 1
                 start = i
-                savelabel.append(start)
                 flag = self.label[i]
             if self.label[i] < flag: #1 -> 0
-                savelabel.append(i)
                 ax2.add_patch(Rectangle((start, 0)
                     , i - start, 1, color='red', alpha=0.2))
                 #ticks.append(self.rawlabel[i])
