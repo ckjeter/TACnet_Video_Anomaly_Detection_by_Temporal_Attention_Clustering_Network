@@ -61,10 +61,12 @@ def test(model, loader, device, args, logger):
         bagoutput = torch.sum(bagoutput, 1)
         result.addbag(bagoutput.view(-1).tolist(), [baglabel])
         
+        
         if bagoutput.item() < -1:
             framepredict = [0] * (sum(length).item())
         else:
-            framepredict = bagexpand(output_seg[0].cpu().tolist(), length)
+            segs = output_seg[0].cpu().tolist()
+            framepredict = bagexpand(segs, length)
         result.add(title[0], feature, framepredict, label, length)
         if args.p_graph:
             figure = result.predictplot(title[0])
