@@ -1,5 +1,5 @@
 # TACnet: Video Anomaly Detection by Temporal Attention Clustering Network
-
+This repo is the offical implementation of this [paper](https://drive.google.com/uc?export=download&id=13ZapwcvD6-HNEcJmo9kbahvLC9ift9KP).
 ## Dataset
 ### UCF Crime
 This dataset is proposed by [Sultani et al.](https://www.crcv.ucf.edu/projects/real-world/) To run this repo, simply download the dataset through the [link](https://www.dropbox.com/sh/75v5ehq4cdg5g5g/AABvnJSwZI7zXb8_myBA0CLHa?dl=0) and unzip to desired location.
